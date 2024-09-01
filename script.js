@@ -1,4 +1,4 @@
-// ==UserScript==
+ // ==UserScript==
 // @name         Leitstellenspiel Verkehrs- und Wetterdaten Dashboard
 // @namespace    https://www.leitstellenspiel.de/
 // @version      2.5
@@ -6,8 +6,6 @@
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
 // @icon         https://www.leitstellenspiel.de/favicon.ico
-// @updateURL    https://github.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/raw/main/leitstellenspiel-dashboard.user.js
-// @downloadURL  https://github.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/raw/main/leitstellenspiel-dashboard.user.js
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -17,21 +15,6 @@
 
 (function() {
     'use strict';
-
-    // URL des .user.js-Skripts auf GitHub Gist
-    const scriptUrl = 'https://gist.github.com/Hudnur111/061f0e0dcae483fc0acd09bb58036dff/raw/a69c4a77d94216bf986090a8eafdf3a390fca95a/Leitstellenspiel%2520Verkehrs-%2520und%2520Wetterdaten%2520Dashboard.user.js';
-
-    // Überprüfen, ob das Skript bereits installiert ist
-    const scriptId = 'github-gist-script-installed';
-    if (localStorage.getItem(scriptId)) return;
-
-    // Skript installieren
-    const scriptElement = document.createElement('script');
-    scriptElement.src = scriptUrl;
-    document.head.appendChild(scriptElement);
-
-    // Markiere als installiert
-    localStorage.setItem(scriptId, 'installed');
 
     // Flag, um den Status des Popups zu verfolgen
     let isPopupVisible = false;
@@ -218,11 +201,11 @@
             probabilities['Unfall'] = 0.1;
         }
 
-        let r = Math.random();
+        const r = Math.random();
         let cumulativeProbability = 0;
 
-        for (let status in probabilities) {
-            cumulativeProbability += probabilities[status];
+        for (const [status, probability] of Object.entries(probabilities)) {
+            cumulativeProbability += probability;
             if (r <= cumulativeProbability) {
                 return status;
             }
@@ -233,7 +216,7 @@
 
     // Verkehrsdaten für jeden Landkreis erstellen
     function generateTrafficData() {
-        const trafficHtml = counties.map(county => `
+        trafficContent.innerHTML = counties.map(county => `
             <div class="county" data-county="${county}">
                 ${county}
                 <div class="countyData">
@@ -241,12 +224,11 @@
                 </div>
             </div>
         `).join('');
-        trafficContent.innerHTML = trafficHtml;
     }
 
     // Wetterdaten für jeden Landkreis erstellen (Dummy-Daten)
     function generateWeatherData() {
-        const weatherHtml = counties.map(county => `
+        weatherContent.innerHTML = counties.map(county => `
             <div class="county" data-county="${county}">
                 ${county}
                 <div class="countyData">
@@ -255,26 +237,26 @@
                 </div>
             </div>
         `).join('');
-        weatherContent.innerHTML = weatherHtml;
     }
 
     // Tab-Wechsel-Handler
-    menuTabs.addEventListener('click', (event) => {
-        if (event.target.id === 'trafficTab') {
+    menuTabs.addEventListener('click', event => {
+        const target = event.target;
+        if (target.id === 'trafficTab') {
             trafficContent.classList.add('active');
             weatherContent.classList.remove('active');
-            event.target.classList.add('active');
+            target.classList.add('active');
             document.getElementById('weatherTab').classList.remove('active');
-        } else if (event.target.id === 'weatherTab') {
+        } else if (target.id === 'weatherTab') {
             weatherContent.classList.add('active');
             trafficContent.classList.remove('active');
-            event.target.classList.add('active');
+            target.classList.add('active');
             document.getElementById('trafficTab').classList.remove('active');
         }
     });
 
     // Landkreis-Daten anzeigen/ausblenden
-    popupMenu.addEventListener('click', (event) => {
+    popupMenu.addEventListener('click', event => {
         if (event.target.classList.contains('county')) {
             const dataDiv = event.target.querySelector('.countyData');
             dataDiv.style.display = dataDiv.style.display === 'block' ? 'none' : 'block';
@@ -282,10 +264,9 @@
     });
 
     // Suchfunktion implementieren
-    document.getElementById('search').addEventListener('input', (event) => {
+    document.getElementById('search').addEventListener('input', event => {
         const searchText = event.target.value.toLowerCase();
-        const countiesDivs = popupMenu.querySelectorAll('.county');
-        countiesDivs.forEach(countyDiv => {
+        document.querySelectorAll('#popupMenu .county').forEach(countyDiv => {
             const countyName = countyDiv.textContent.toLowerCase();
             countyDiv.style.display = countyName.includes(searchText) ? 'block' : 'none';
         });
