@@ -6,12 +6,15 @@
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
 // @icon         https://www.leitstellenspiel.de/favicon.ico
+// @updateURL    https://github.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/raw/main/leitstellenspiel-dashboard.user.js
+// @downloadURL  https://github.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/raw/main/leitstellenspiel-dashboard.user.js
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_registerMenuCommand
 // @license      GPL-3.0-or-later
 // ==/UserScript==
+
 
 (function() {
     'use strict';
