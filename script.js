@@ -6,8 +6,8 @@
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
 // @icon         https://www.leitstellenspiel.de/favicon.ico
-// @updateURL    https://gist.github.com/Hudnur111/061f0e0dcae483fc0acd09bb58036dff/raw/a69c4a77d94216bf986090a8eafdf3a390fca95a/Leitstellenspiel%2520Verkehrs-%2520und%2520Wetterdaten%2520Dashboard.user.js
-// @downloadURL  https://gist.github.com/Hudnur111/061f0e0dcae483fc0acd09bb58036dff/raw/a69c4a77d94216bf986090a8eafdf3a390fca95a/Leitstellenspiel%2520Verkehrs-%2520und%2520Wetterdaten%2520Dashboard.user.js
+// @updateURL    https://github.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/raw/main/leitstellenspiel-dashboard.user.js
+// @downloadURL  https://github.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/raw/main/leitstellenspiel-dashboard.user.js
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -17,6 +17,21 @@
 
 (function() {
     'use strict';
+
+    // URL des .user.js-Skripts auf GitHub Gist
+    const scriptUrl = 'https://gist.github.com/Hudnur111/061f0e0dcae483fc0acd09bb58036dff/raw/a69c4a77d94216bf986090a8eafdf3a390fca95a/Leitstellenspiel%2520Verkehrs-%2520und%2520Wetterdaten%2520Dashboard.user.js';
+
+    // Überprüfen, ob das Skript bereits installiert ist
+    const scriptId = 'github-gist-script-installed';
+    if (localStorage.getItem(scriptId)) return;
+
+    // Skript installieren
+    const scriptElement = document.createElement('script');
+    scriptElement.src = scriptUrl;
+    document.head.appendChild(scriptElement);
+
+    // Markiere als installiert
+    localStorage.setItem(scriptId, 'installed');
 
     // Flag, um den Status des Popups zu verfolgen
     let isPopupVisible = false;
@@ -199,164 +214,90 @@
         };
 
         if (county.includes('Stuttgart') || county.includes('Karlsruhe')) {
-            probabilities['Stau'] += 0.1;
-            probabilities['Unfall'] += 0.05;
-        }
-        if (county.includes('Freiburg') || county.includes('Bodenseekreis')) {
-            probabilities['Baustelle'] += 0.05;
+            probabilities['Stau'] = 0.25; // Höhere Wahrscheinlichkeit für große Städte
+            probabilities['Unfall'] = 0.1;
         }
 
-        let status = 'Freie Fahrt';
-        const random = Math.random();
+        let r = Math.random();
         let cumulativeProbability = 0;
-        for (const [statusKey, probability] of Object.entries(probabilities)) {
-            cumulativeProbability += probability;
-            if (random <= cumulativeProbability) {
-                status = statusKey;
-                break;
+
+        for (let status in probabilities) {
+            cumulativeProbability += probabilities[status];
+            if (r <= cumulativeProbability) {
+                return status;
             }
         }
-        return status;
+
+        return 'Freie Fahrt'; // Default-Wert
     }
 
-    // Dummy-Daten initialisieren
-    const trafficData = counties.map(county => ({
-        county: county,
-        status: getRandomTrafficStatus(county),
-        duration: Math.floor(Math.random() * 60) + 10 // Zufällige Fahrtdauer zwischen 10 und 70 Minuten
-    }));
+    // Verkehrsdaten für jeden Landkreis erstellen
+    function generateTrafficData() {
+        const trafficHtml = counties.map(county => `
+            <div class="county" data-county="${county}">
+                ${county}
+                <div class="countyData">
+                    Status: ${getRandomTrafficStatus(county)}
+                </div>
+            </div>
+        `).join('');
+        trafficContent.innerHTML = trafficHtml;
+    }
 
-    const weatherData = counties.map(county => ({
-        county: county,
-        temperature: (Math.random() * 30).toFixed(1) + ' °C',
-        humidity: Math.floor(Math.random() * 100) + ' %',
-        status: ['Sonnig', 'Bewölkt', 'Regen', 'Schnee', 'Nebel'][Math.floor(Math.random() * 5)]
-    }));
+    // Wetterdaten für jeden Landkreis erstellen (Dummy-Daten)
+    function generateWeatherData() {
+        const weatherHtml = counties.map(county => `
+            <div class="county" data-county="${county}">
+                ${county}
+                <div class="countyData">
+                    Temperatur: ${Math.floor(Math.random() * 15) + 10}°C<br>
+                    Wetter: ${['Sonnig', 'Bewölkt', 'Regnerisch', 'Schneefall'][Math.floor(Math.random() * 4)]}
+                </div>
+            </div>
+        `).join('');
+        weatherContent.innerHTML = weatherHtml;
+    }
 
-    // Erstelle ein Element für einen Landkreis mit entsprechenden Daten
-    function createCountyElement(county, dataType) {
-        const countyElement = document.createElement('div');
-        countyElement.className = 'county';
-        countyElement.textContent = county;
-
-        const countyDataElement = document.createElement('div');
-        countyDataElement.className = 'countyData';
-
-        // Daten je nach Typ anzeigen
-        if (dataType === 'traffic') {
-            const trafficInfo = trafficData.find(data => data.county === county);
-            countyDataElement.innerHTML = `
-                <p>Verkehrszustand: ${trafficInfo.status}</p>
-                <p>Fahrtdauer: ${trafficInfo.duration} Minuten</p>
-            `;
-        } else if (dataType === 'weather') {
-            const weatherInfo = weatherData.find(data => data.county === county);
-            countyDataElement.innerHTML = `
-                <p>Temperatur: ${weatherInfo.temperature}</p>
-                <p>Feuchtigkeit: ${weatherInfo.humidity}</p>
-                <p>Wetterstatus: ${weatherInfo.status}</p>
-            `;
+    // Tab-Wechsel-Handler
+    menuTabs.addEventListener('click', (event) => {
+        if (event.target.id === 'trafficTab') {
+            trafficContent.classList.add('active');
+            weatherContent.classList.remove('active');
+            event.target.classList.add('active');
+            document.getElementById('weatherTab').classList.remove('active');
+        } else if (event.target.id === 'weatherTab') {
+            weatherContent.classList.add('active');
+            trafficContent.classList.remove('active');
+            event.target.classList.add('active');
+            document.getElementById('trafficTab').classList.remove('active');
         }
+    });
 
-        countyElement.appendChild(countyDataElement);
+    // Landkreis-Daten anzeigen/ausblenden
+    popupMenu.addEventListener('click', (event) => {
+        if (event.target.classList.contains('county')) {
+            const dataDiv = event.target.querySelector('.countyData');
+            dataDiv.style.display = dataDiv.style.display === 'block' ? 'none' : 'block';
+        }
+    });
 
-        countyElement.addEventListener('click', () => {
-            // Toggle-Funktion für die Sichtbarkeit der Landkreisdaten
-            const isVisible = countyDataElement.style.display === 'block';
-            countyDataElement.style.display = isVisible ? 'none' : 'block';
-            countyDataElement.style.maxHeight = isVisible ? '0' : '1000px';
-        });
-
-        return countyElement;
-    }
-
-    // Fülle die Menüinhalte mit den Landkreisdaten
-    function populateMenu() {
-        // Verkehrsdaten
-        trafficContent.innerHTML = '';
-        counties.forEach(county => {
-            const countyElement = createCountyElement(county, 'traffic');
-            trafficContent.appendChild(countyElement);
-        });
-
-        // Wetterdaten
-        weatherContent.innerHTML = '';
-        counties.forEach(county => {
-            const countyElement = createCountyElement(county, 'weather');
-            weatherContent.appendChild(countyElement);
-        });
-    }
-
-    populateMenu();
-
-    // Filterfunktion für die Landkreise basierend auf der Sucheingabe
-    function filterCounties(searchTerm) {
-        const searchTermLower = searchTerm.toLowerCase();
-
-        // Filter für Verkehrsdaten
-        trafficContent.querySelectorAll('.county').forEach(element => {
-            const countyName = element.textContent.toLowerCase();
-            element.style.display = countyName.includes(searchTermLower) ? 'block' : 'none';
-        });
-
-        // Filter für Wetterdaten
-        weatherContent.querySelectorAll('.county').forEach(element => {
-            const countyName = element.textContent.toLowerCase();
-            element.style.display = countyName.includes(searchTermLower) ? 'block' : 'none';
-        });
-    }
-
+    // Suchfunktion implementieren
     document.getElementById('search').addEventListener('input', (event) => {
-        filterCounties(event.target.value);
+        const searchText = event.target.value.toLowerCase();
+        const countiesDivs = popupMenu.querySelectorAll('.county');
+        countiesDivs.forEach(countyDiv => {
+            const countyName = countyDiv.textContent.toLowerCase();
+            countyDiv.style.display = countyName.includes(searchText) ? 'block' : 'none';
+        });
     });
 
-    // Menü-Tabs-Funktionalität
-    document.getElementById('trafficTab').addEventListener('click', () => {
-        document.getElementById('trafficTab').classList.add('active');
-        document.getElementById('weatherTab').classList.remove('active');
-        document.getElementById('trafficContent').classList.add('active');
-        document.getElementById('weatherContent').classList.remove('active');
-    });
-
-    document.getElementById('weatherTab').addEventListener('click', () => {
-        document.getElementById('weatherTab').classList.add('active');
-        document.getElementById('trafficTab').classList.remove('active');
-        document.getElementById('weatherContent').classList.add('active');
-        document.getElementById('trafficContent').classList.remove('active');
-    });
-
-    // Toggle-Funktion für das Popup
+    // Button-Klick-Handler
     infoButton.addEventListener('click', () => {
-        if (isPopupVisible) {
-            popupMenu.classList.remove('show');
-            setTimeout(() => { popupMenu.style.display = 'none'; }, 500); // Warten, bis die Animation endet
-            isPopupVisible = false;
-        } else {
-            popupMenu.style.display = 'block';
-            setTimeout(() => { popupMenu.classList.add('show'); }, 10); // Start der Animation
-            isPopupVisible = true;
-        }
+        isPopupVisible = !isPopupVisible;
+        popupMenu.classList.toggle('show', isPopupVisible);
     });
 
-    // Aktualisierungsintervalle
-    function updateTrafficData() {
-        trafficData.forEach(data => {
-            data.status = getRandomTrafficStatus(data.county);
-            data.duration = Math.floor(Math.random() * 60) + 10; // Zufällige Fahrtdauer zwischen 10 und 70 Minuten
-        });
-        populateMenu(); // Aktualisiere die Anzeige
-    }
-
-    function updateWeatherData() {
-        weatherData.forEach(data => {
-            data.temperature = (Math.random() * 30).toFixed(1) + ' °C';
-            data.humidity = Math.floor(Math.random() * 100) + ' %';
-            data.status = ['Sonnig', 'Bewölkt', 'Regen', 'Schnee', 'Nebel'][Math.floor(Math.random() * 5)];
-        });
-        populateMenu(); // Aktualisiere die Anzeige
-    }
-
-    setInterval(updateTrafficData, 600000); // Alle 10 Minuten
-    setInterval(updateWeatherData, 43200000); // Alle 12 Stunden
-
+    // Initialdaten generieren
+    generateTrafficData();
+    generateWeatherData();
 })();
