@@ -245,27 +245,43 @@
         return 'Freie Fahrt'; // Default value
     }
 
-    function generateTrafficData() {
-        trafficContent.innerHTML = counties.map(county => `
-            <div class="county">
-                ${county}
-                <div class="countyData">
-                    Status: ${getRandomTrafficStatus(county)}
-                </div>
-            </div>
-        `).join('');
+    function getSeasonalWeatherData(month) {
+        let temperatures, weatherConditions;
+
+        if ([12, 1, 2].includes(month)) {
+            temperatures = [0, 5, -3, 2, -1]; // Winter
+            weatherConditions = ['Schneefall', 'Bewölkt', 'Regnerisch', 'Klar'];
+        } else if ([3, 4, 5].includes(month)) {
+            temperatures = [10, 15, 8, 12, 14]; // Frühling
+            weatherConditions = ['Sonnig', 'Bewölkt', 'Regnerisch', 'Leichter Regen'];
+        } else if ([6, 7, 8].includes(month)) {
+            temperatures = [20, 25, 22, 30, 18]; // Sommer
+            weatherConditions = ['Sonnig', 'Bewölkt', 'Leichter Regen', 'Hitze'];
+        } else if ([9, 10, 11].includes(month)) {
+            temperatures = [10, 15, 8, 12, 5]; // Herbst
+            weatherConditions = ['Sonnig', 'Bewölkt', 'Regnerisch', 'Stürmisch'];
+        }
+
+        const randomTemp = temperatures[Math.floor(Math.random() * temperatures.length)];
+        const randomCondition = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+
+        return { temperature: randomTemp, condition: randomCondition };
     }
 
     function generateWeatherData() {
-        weatherContent.innerHTML = counties.map(county => `
-            <div class="county">
-                ${county}
-                <div class="countyData">
-                    Temperatur: ${Math.floor(Math.random() * 15) + 10}°C<br>
-                    Wetter: ${['Sonnig', 'Bewölkt', 'Regnerisch', 'Schneefall'][Math.floor(Math.random() * 4)]}
+        const currentMonth = new Date().getMonth() + 1; // Monate beginnen bei 0, daher +1
+        weatherContent.innerHTML = counties.map(county => {
+            const weatherData = getSeasonalWeatherData(currentMonth);
+            return `
+                <div class="county">
+                    ${county}
+                    <div class="countyData">
+                        Temperatur: ${weatherData.temperature}°C<br>
+                        Wetter: ${weatherData.condition}
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     menuTabs.addEventListener('click', event => {
