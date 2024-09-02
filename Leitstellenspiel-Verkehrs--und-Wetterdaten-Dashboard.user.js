@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Leitstellenspiel Verkehrs- und Wetterdaten Dashboard
 // @namespace    https://www.leitstellenspiel.de/
-// @version      3.0
+// @version      3.2
 // @description  Zeigt aktuelle Verkehrs- und Wetterdaten für Baden-Württemberg an, inklusive interaktiver Such- und Filterfunktionen. Ein Button wird bei Drücken von "i" für 1 Minute angezeigt und das Menü wird bei Drücken von "c" geschlossen.
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
@@ -20,42 +20,11 @@
     'use strict';
 
     const SCRIPT_NAME = 'Leitstellenspiel Verkehrs- und Wetterdaten Dashboard';
-    const CURRENT_VERSION = '3.0';
+    const CURRENT_VERSION = '3.2';
     const UPDATE_URL = 'https://raw.githubusercontent.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/main/script.js';
     const VERSION_URL = 'https://raw.githubusercontent.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/main/version.txt';
 
-    // Update Check
-    function checkForUpdate() {
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: VERSION_URL,
-            onload: function(response) {
-                if (response.status === 200) {
-                    const latestVersion = response.responseText.trim();
-                    if (latestVersion !== CURRENT_VERSION) {
-                        notifyUserForUpdate(latestVersion);
-                    }
-                }
-            },
-            onerror: function() {
-                console.error('Fehler beim Abrufen der Versionsinformationen.');
-            }
-        });
-    }
-
-    function notifyUserForUpdate(latestVersion) {
-        GM_notification({
-            text: `${SCRIPT_NAME} (Version ${latestVersion}) Jetzt Aktualisieren!`,
-            title: 'Neue Version verfügbar',
-            onclick: function() {
-                window.open(UPDATE_URL, '_blank');
-            }
-        });
-    }
-
-    checkForUpdate();
-
-    // CSS-Stile für das Dashboard
+    // Styles for the dashboard to make the counties clearly visible
     GM_addStyle(`
         #infoButton {
             position: fixed;
@@ -83,7 +52,7 @@
             position: fixed;
             bottom: 80px;
             right: 20px;
-            width: 360px;
+            width: 400px;
             max-height: 600px;
             background-color: #fff;
             border: 1px solid #007bff;
@@ -137,25 +106,25 @@
             font-weight: bold;
             cursor: pointer;
             margin-top: 10px;
-            padding: 8px;
-            color: #333;
-            transition: background-color 0.3s ease;
-            font-size: 15px;
+            padding: 10px;
+            background-color: #f9f9f9;
             border: 1px solid #ddd;
-            border-radius: 6px;
+            border-radius: 8px;
+            color: #333;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
         .county:hover {
-            background-color: #e7f1ff;
+            background-color: #f0f8ff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
         .countyData {
             display: none;
             margin-top: 8px;
             padding: 8px;
-            border: 1px solid #ddd;
+            border: 1px solid #eee;
             border-radius: 6px;
             background-color: #fafafa;
-            font-size: 14px;
-            transition: all 0.3s ease;
+            font-size: 13px;
         }
         .county.active .countyData {
             display: block;
@@ -165,36 +134,10 @@
         }
         .searchBox input {
             width: 100%;
-            padding: 10px;
+            padding: 8px;
             border-radius: 6px;
             border: 1px solid #ddd;
             font-size: 14px;
-        }
-        .tooltip {
-            position: relative;
-            display: inline-block;
-            cursor: pointer;
-            border-bottom: 1px dotted black;
-        }
-        .tooltip .tooltiptext {
-            visibility: hidden;
-            width: 120px;
-            background-color: #555;
-            color: #fff;
-            text-align: center;
-            border-radius: 6px;
-            padding: 5px;
-            position: absolute;
-            z-index: 1;
-            bottom: 125%; /* Position tooltip above the text */
-            left: 50%;
-            margin-left: -60px;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
         }
     `);
 
@@ -232,32 +175,22 @@
     const counties = [
         'Alb-Donau-Kreis', 'Bodenseekreis', 'Breisgau-Hochschwarzwald', 'Böblingen',
         'Esslingen', 'Göppingen', 'Heidenheim', 'Heilbronn', 'Hohenlohekreis', 'Karlsruhe',
-        'Ludwigsburg', 'Main-Tauber-Kreis', 'Neckar-Odenwald-Kreis', 'Ortenaukreis', 'Ostalbkreis',
-        'Rastatt', 'Reutlingen', 'Rhein-Neckar-Kreis', 'Rottweil', 'Schwarzwald-Baar-Kreis',
-        'Sigmaringen', 'Tübingen', 'Tuttlingen', 'Zollernalbkreis'
+        'Ludwigsburg', 'Main-Tauber-Kreis', 'Neckar-Odenwald-Kreis', 'Ortenaukreis',
+        'Ostalbkreis', 'Pforzheim', 'Rastatt', 'Rems-Murr-Kreis', 'Reutlingen',
+        'Rhein-Neckar-Kreis', 'Rottweil', 'Schwäbisch Hall', 'Sigmaringen',
+        'Stuttgart', 'Tübingen', 'Ulm', 'Zollernalbkreis', 'Freiburg', 'Pforzheim', 'Lörrach'
     ];
-
-    function generateTrafficData() {
-        trafficContent.innerHTML = counties.map(county => `
-            <div class="county tooltip">
-                ${county}
-                <span class="tooltiptext">Klicken für Details</span>
-                <div class="countyData">
-                    Verkehr: ${getRandomTrafficStatus(county)}
-                </div>
-            </div>
-        `).join('');
-    }
 
     function getRandomTrafficStatus(county) {
         const probabilities = {
-            'Freie Fahrt': 0.6,
+            'Freie Fahrt': 0.5,
             'Stau': 0.2,
             'Unfall': 0.15,
-            'Straßensperrung': 0.05
+            'Baustelle': 0.1,
+            'Verkehrsbehinderung': 0.05
         };
 
-        if (county.toLowerCase().includes('ruhe')) {
+        if (county.includes('Stuttgart') || county.includes('Karlsruhe')) {
             probabilities['Stau'] = 0.25;
             probabilities['Unfall'] = 0.1;
         }
@@ -271,113 +204,99 @@
                 return status;
             }
         }
-        return 'Freie Fahrt'; // Default value
+        return 'Freie Fahrt';
     }
 
     function getSeasonalWeatherData(month) {
         let temperatures, weatherConditions;
 
         if ([12, 1, 2].includes(month)) {
-            temperatures = [0, 5, -3, 2, -1]; // Winter
+            temperatures = [-3, 0, 2, 5];
             weatherConditions = ['Schneefall', 'Bewölkt', 'Regnerisch', 'Klar'];
         } else if ([3, 4, 5].includes(month)) {
-            temperatures = [10, 15, 8, 12, 14]; // Frühling
+            temperatures = [8, 12, 14, 15];
             weatherConditions = ['Sonnig', 'Bewölkt', 'Regnerisch', 'Leichter Regen'];
         } else if ([6, 7, 8].includes(month)) {
-            temperatures = [20, 25, 22, 30, 18]; // Sommer
-            weatherConditions = ['Sonnig', 'Bewölkt', 'Leichter Regen', 'Hitze'];
-        } else if ([9, 10, 11].includes(month)) {
-            temperatures = [10, 15, 8, 12, 5]; // Herbst
-            weatherConditions = ['Sonnig', 'Bewölkt', 'Regnerisch', 'Stürmisch'];
+            temperatures = [18, 22, 25, 30];
+            weatherConditions = ['Sonnig', 'Heiß', 'Gewitter', 'Leicht Bewölkt'];
+        } else {
+            temperatures = [10, 12, 14, 8];
+            weatherConditions = ['Bewölkt', 'Regnerisch', 'Windig', 'Klar'];
         }
 
-        const randomTemp = temperatures[Math.floor(Math.random() * temperatures.length)];
-        const randomCondition = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
+        const temperature = temperatures[Math.floor(Math.random() * temperatures.length)];
+        const condition = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
 
-        return { temperature: randomTemp, condition: randomCondition };
+        return { temperature, condition };
     }
 
-    function generateWeatherData() {
-        const currentMonth = new Date().getMonth() + 1; // Monate beginnen bei 0, daher +1
-        weatherContent.innerHTML = counties.map(county => {
-            const weatherData = getSeasonalWeatherData(currentMonth);
-            return `
-                <div class="county tooltip">
-                    ${county}
-                    <span class="tooltiptext">Klicken für Details</span>
-                    <div class="countyData">
-                        Temperatur: ${weatherData.temperature}°C<br>
-                        Wetter: ${weatherData.condition}
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
+    counties.forEach(county => {
+        const countyDiv = document.createElement('div');
+        countyDiv.className = 'county';
+        countyDiv.textContent = county;
 
-    menuTabs.addEventListener('click', event => {
-        const target = event.target;
-        if (target.id === 'trafficTab') {
-            trafficContent.classList.add('active');
-            weatherContent.classList.remove('active');
-            target.classList.add('active');
-            document.getElementById('weatherTab').classList.remove('active');
-        } else if (target.id === 'weatherTab') {
-            weatherContent.classList.add('active');
-            trafficContent.classList.remove('active');
-            target.classList.add('active');
-            document.getElementById('trafficTab').classList.remove('active');
-        }
+        const countyData = document.createElement('div');
+        countyData.className = 'countyData';
+        countyData.innerHTML = `
+            <p><strong>Verkehr:</strong> ${getRandomTrafficStatus(county)}</p>
+            <p><strong>Wetter:</strong> ${
+                getSeasonalWeatherData(new Date().getMonth() + 1).condition
+            }, ${
+                getSeasonalWeatherData(new Date().getMonth() + 1).temperature
+            }°C</p>
+        `;
+        countyDiv.appendChild(countyData);
+
+        countyDiv.addEventListener('click', () => {
+            countyDiv.classList.toggle('active');
+        });
+
+        trafficContent.appendChild(countyDiv);
     });
 
-    popupMenu.addEventListener('click', event => {
-        if (event.target.classList.contains('county')) {
-            const dataDiv = event.target.querySelector('.countyData');
-            dataDiv.style.display = dataDiv.style.display === 'block' ? 'none' : 'block';
-        }
+    // Add functionality to tabs
+    const trafficTab = document.getElementById('trafficTab');
+    const weatherTab = document.getElementById('weatherTab');
+    const trafficTabContent = document.getElementById('trafficContent');
+    const weatherTabContent = document.getElementById('weatherContent');
+
+    trafficTab.addEventListener('click', () => {
+        trafficTab.classList.add('active');
+        weatherTab.classList.remove('active');
+        trafficTabContent.classList.add('active');
+        weatherTabContent.classList.remove('active');
     });
 
-    document.getElementById('search').addEventListener('input', event => {
-        const searchText = event.target.value.toLowerCase();
-        document.querySelectorAll('#popupMenu .county').forEach(countyDiv => {
-            const countyName = countyDiv.textContent.toLowerCase();
-            countyDiv.style.display = countyName.includes(searchText) ? 'block' : 'none';
+    weatherTab.addEventListener('click', () => {
+        weatherTab.classList.add('active');
+        trafficTab.classList.remove('active');
+        weatherTabContent.classList.add('active');
+        trafficTabContent.classList.remove('active');
+    });
+
+    // Add search functionality
+    const searchInput = document.getElementById('search');
+    searchInput.addEventListener('input', () => {
+        const filter = searchInput.value.toLowerCase();
+        const countyElements = document.querySelectorAll('.county');
+
+        countyElements.forEach(county => {
+            const text = county.textContent.toLowerCase();
+            county.style.display = text.includes(filter) ? '' : 'none';
         });
     });
 
-    let isPopupVisible = false;
-    let buttonVisibleUntil = 0;
-
+    // Add functionality to info button
     infoButton.addEventListener('click', () => {
-        isPopupVisible = !isPopupVisible;
-        popupMenu.classList.toggle('show', isPopupVisible);
+        popupMenu.classList.toggle('show');
     });
 
-    document.addEventListener('keydown', event => {
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(event) {
         if (event.key === 'i') {
-            buttonVisibleUntil = Date.now() + 60000;
-            infoButton.style.display = 'block';
+            popupMenu.classList.toggle('show');
         } else if (event.key === 'c') {
-            isPopupVisible = false;
             popupMenu.classList.remove('show');
         }
     });
-
-    function checkButtonVisibility() {
-        if (Date.now() > buttonVisibleUntil) {
-            infoButton.style.display = 'none';
-        }
-    }
-
-    setInterval(checkButtonVisibility, 1000);
-
-    infoButton.addEventListener('mouseover', () => {
-        buttonVisibleUntil = Date.now() + 60000;
-    });
-
-    infoButton.addEventListener('mouseout', () => {
-        buttonVisibleUntil = Date.now() - 1000;
-    });
-
-    generateTrafficData();
-    generateWeatherData();
 })();
