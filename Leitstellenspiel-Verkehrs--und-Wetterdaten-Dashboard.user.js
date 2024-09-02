@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Leitstellenspiel Verkehrs- und Wetterdaten Dashboard
 // @namespace    https://www.leitstellenspiel.de/
-// @version      2.9
+// @version      3.0
 // @description  Zeigt aktuelle Verkehrs- und Wetterdaten für Baden-Württemberg an, inklusive interaktiver Such- und Filterfunktionen. Ein Button wird bei Drücken von "i" für 1 Minute angezeigt und das Menü wird bei Drücken von "c" geschlossen.
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
@@ -20,11 +20,11 @@
     'use strict';
 
     const SCRIPT_NAME = 'Leitstellenspiel Verkehrs- und Wetterdaten Dashboard';
-    const CURRENT_VERSION = '2.9';
-    const UPDATE_URL = 'https://raw.githubusercontent.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/main/script.js'; // GitHub URL for script update
-    const VERSION_URL = 'https://raw.githubusercontent.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/main/version.txt'; // GitHub URL for version file
+    const CURRENT_VERSION = '3.0';
+    const UPDATE_URL = 'https://raw.githubusercontent.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/main/script.js';
+    const VERSION_URL = 'https://raw.githubusercontent.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/main/version.txt';
 
-    // Check for script updates
+    // Update Check
     function checkForUpdate() {
         GM_xmlhttpRequest({
             method: 'GET',
@@ -43,7 +43,6 @@
         });
     }
 
-    // Notify user about an available update
     function notifyUserForUpdate(latestVersion) {
         GM_notification({
             text: `${SCRIPT_NAME} (Version ${latestVersion}) Jetzt Aktualisieren!`,
@@ -54,10 +53,9 @@
         });
     }
 
-    // Check for updates on script load
     checkForUpdate();
 
-    // CSS for the dashboard
+    // CSS-Stile für das Dashboard
     GM_addStyle(`
         #infoButton {
             position: fixed;
@@ -85,7 +83,7 @@
             position: fixed;
             bottom: 80px;
             right: 20px;
-            width: 340px;
+            width: 360px;
             max-height: 600px;
             background-color: #fff;
             border: 1px solid #007bff;
@@ -139,35 +137,64 @@
             font-weight: bold;
             cursor: pointer;
             margin-top: 10px;
-            border-bottom: 1px solid #eee;
             padding: 8px;
             color: #333;
             transition: background-color 0.3s ease;
-            font-size: 14px;
+            font-size: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
         }
         .county:hover {
-            background-color: #f0f8ff;
+            background-color: #e7f1ff;
         }
         .countyData {
             display: none;
-            margin-left: 15px;
-            margin-top: 5px;
+            margin-top: 8px;
             padding: 8px;
-            border: 1px solid #eee;
+            border: 1px solid #ddd;
             border-radius: 6px;
             background-color: #fafafa;
-            transition: max-height 0.3s ease;
-            font-size: 13px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .county.active .countyData {
+            display: block;
         }
         .searchBox {
             margin-bottom: 15px;
         }
         .searchBox input {
             width: 100%;
-            padding: 8px;
+            padding: 10px;
             border-radius: 6px;
             border: 1px solid #ddd;
             font-size: 14px;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            border-bottom: 1px dotted black;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 120px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* Position tooltip above the text */
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
         }
     `);
 
@@ -189,7 +216,7 @@
 
     const searchBox = document.createElement('div');
     searchBox.className = 'searchBox';
-    searchBox.innerHTML = '<input type="text" id="search" placeholder="Suche...">';
+    searchBox.innerHTML = '<input type="text" id="search" placeholder="Suche nach Landkreis...">';
     popupMenu.appendChild(searchBox);
 
     const trafficContent = document.createElement('div');
@@ -205,30 +232,32 @@
     const counties = [
         'Alb-Donau-Kreis', 'Bodenseekreis', 'Breisgau-Hochschwarzwald', 'Böblingen',
         'Esslingen', 'Göppingen', 'Heidenheim', 'Heilbronn', 'Hohenlohekreis', 'Karlsruhe',
-        'Ludwigsburg', 'Main-Tauber-Kreis', 'Neckar-Odenwald-Kreis', 'Ortenaukreis',
-        'Ostalbkreis', 'Pforzheim', 'Rastatt', 'Rems-Murr-Kreis', 'Reutlingen',
-        'Rhein-Neckar-Kreis', 'Rottweil', 'Schwäbisch Hall', 'Sigmaringen',
-        'Stuttgart', 'Tübingen', 'Ulm', 'Zollernalbkreis', 'Freiburg', 'Pforzheim', 'Lörrach'
+        'Ludwigsburg', 'Main-Tauber-Kreis', 'Neckar-Odenwald-Kreis', 'Ortenaukreis', 'Ostalbkreis',
+        'Rastatt', 'Reutlingen', 'Rhein-Neckar-Kreis', 'Rottweil', 'Schwarzwald-Baar-Kreis',
+        'Sigmaringen', 'Tübingen', 'Tuttlingen', 'Zollernalbkreis'
     ];
 
-    const trafficStatuses = [
-        'Freie Fahrt', 'Stockender Verkehr', 'Stau', 'Unfall', 'Baustelle',
-        'Umleitung', 'Geschwindigkeitsbegrenzung', 'Vollsperrung',
-        'Wetterbedingter Verkehr', 'Gesperrter Bereich', 'Temporäre Sperrung',
-        'Verkehrsbehinderungen'
-    ];
+    function generateTrafficData() {
+        trafficContent.innerHTML = counties.map(county => `
+            <div class="county tooltip">
+                ${county}
+                <span class="tooltiptext">Klicken für Details</span>
+                <div class="countyData">
+                    Verkehr: ${getRandomTrafficStatus(county)}
+                </div>
+            </div>
+        `).join('');
+    }
 
     function getRandomTrafficStatus(county) {
         const probabilities = {
-            'Stau': 0.1,
-            'Unfall': 0.05,
-            'Baustelle': 0.1,
-            'Stockender Verkehr': 0.2,
-            'Verkehrsbehinderungen': 0.15,
-            'Freie Fahrt': 0.4
+            'Freie Fahrt': 0.6,
+            'Stau': 0.2,
+            'Unfall': 0.15,
+            'Straßensperrung': 0.05
         };
 
-        if (county.includes('Stuttgart') || county.includes('Karlsruhe')) {
+        if (county.toLowerCase().includes('ruhe')) {
             probabilities['Stau'] = 0.25;
             probabilities['Unfall'] = 0.1;
         }
@@ -273,8 +302,9 @@
         weatherContent.innerHTML = counties.map(county => {
             const weatherData = getSeasonalWeatherData(currentMonth);
             return `
-                <div class="county">
+                <div class="county tooltip">
                     ${county}
+                    <span class="tooltiptext">Klicken für Details</span>
                     <div class="countyData">
                         Temperatur: ${weatherData.temperature}°C<br>
                         Wetter: ${weatherData.condition}
