@@ -235,23 +235,35 @@
         countyDiv.className = 'county';
         countyDiv.textContent = county;
 
-        const countyData = document.createElement('div');
-        countyData.className = 'countyData';
-        countyData.innerHTML = `
+        const trafficData = document.createElement('div');
+        trafficData.className = 'countyData';
+        trafficData.innerHTML = `
             <p><strong>Verkehr:</strong> ${getRandomTrafficStatus(county)}</p>
+        `;
+        countyDiv.appendChild(trafficData);
+        trafficContent.appendChild(countyDiv);
+
+        const weatherData = document.createElement('div');
+        weatherData.className = 'countyData';
+        weatherData.innerHTML = `
             <p><strong>Wetter:</strong> ${
                 getSeasonalWeatherData(new Date().getMonth() + 1).condition
             }, ${
                 getSeasonalWeatherData(new Date().getMonth() + 1).temperature
             }°C</p>
         `;
-        countyDiv.appendChild(countyData);
+        const weatherCountyDiv = countyDiv.cloneNode(true);
+        weatherCountyDiv.removeChild(weatherCountyDiv.firstChild); // remove traffic data from clone
+        weatherCountyDiv.appendChild(weatherData);
+        weatherContent.appendChild(weatherCountyDiv);
 
         countyDiv.addEventListener('click', () => {
             countyDiv.classList.toggle('active');
         });
 
-        trafficContent.appendChild(countyDiv);
+        weatherCountyDiv.addEventListener('click', () => {
+            weatherCountyDiv.classList.toggle('active');
+        });
     });
 
     // Add functionality to tabs
