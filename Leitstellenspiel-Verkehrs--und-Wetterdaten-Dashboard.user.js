@@ -1,314 +1,235 @@
 // ==UserScript==
 // @name         Leitstellenspiel Verkehrs- und Wetterdaten Dashboard
 // @namespace    https://www.leitstellenspiel.de/
-// @version      3.2
+// @version      4.0
 // @description  Zeigt aktuelle Verkehrs- und Wetterdaten für Baden-Württemberg an, inklusive interaktiver Such- und Filterfunktionen. Ein Button wird bei Drücken von "i" für 1 Minute angezeigt und das Menü wird bei Drücken von "c" geschlossen.
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
 // @icon         https://www.leitstellenspiel.de/favicon.ico
 // @grant        GM_addStyle
-// @grant        GM_setValue
-// @grant        GM_getValue
-// @grant        GM_registerMenuCommand
-// @grant        GM_xmlhttpRequest
-// @grant        GM_notification
 // @license      GPL-3.0-or-later
-// @connect      github.com
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    const SCRIPT_NAME = 'Leitstellenspiel Verkehrs- und Wetterdaten Dashboard';
-    const CURRENT_VERSION = '3.2';
-    const UPDATE_URL = 'https://raw.githubusercontent.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/main/script.js';
-    const VERSION_URL = 'https://raw.githubusercontent.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/main/version.txt';
+    const DISPLAY_TIME = 60000; // 1 Minute in Millisekunden
+    const INFO_BUTTON_ID = 'infoButton';
+    const POPUP_ID = 'infoPopup';
 
-    // Styles for the dashboard to make the counties clearly visible
+    // Liste aller Landkreise in Baden-Württemberg
+    const counties = [
+        'Alb-Donau-Kreis', 'Baden-Baden', 'Böblingen', 'Baden-Württemberg', 'Baden-Württemberg', 
+        'Heilbronn', 'Karlsruhe', 'Kreis Biberach', 'Kreis Konstanz', 'Kreis Esslingen', 
+        'Kreis Ravensburg', 'Kreis Rems-Murr', 'Kreis Rottweil', 'Kreis Tübingen', 'Kreis Ulm', 
+        'Ortenaukreis', 'Pforzheim', 'Stuttgart', 'Zollernalbkreis'
+    ];
+
+    // Erstelle und style den Info-Button
     GM_addStyle(`
-        #infoButton {
+        #${INFO_BUTTON_ID} {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 10px;
+            right: 10px;
             width: 50px;
             height: 50px;
-            background-color: #007bff;
             border-radius: 50%;
+            background-color: #007bff;
+            color: white;
+            text-align: center;
+            line-height: 50px;
+            font-size: 24px;
             cursor: pointer;
-            z-index: 10000;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            display: none;
+            z-index: 9999;
         }
-        #infoButton:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-        }
-        #infoButton:active {
-            transform: scale(0.95);
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-        }
-        #popupMenu {
+        #${POPUP_ID} {
             position: fixed;
-            bottom: 80px;
-            right: 20px;
+            bottom: 70px;
+            right: 10px;
             width: 400px;
-            max-height: 600px;
-            background-color: #fff;
-            border: 1px solid #007bff;
-            border-radius: 12px;
-            padding: 15px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            z-index: 10000;
-            overflow-y: auto;
+            height: 300px;
+            background: white;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             display: none;
-            opacity: 0;
-            transition: opacity 0.4s ease, transform 0.4s ease;
-            transform: translateY(20px);
+            z-index: 9999;
+            overflow: auto;
         }
-        #popupMenu.show {
-            display: block;
-            opacity: 1;
-            transform: translateY(0);
+        #${POPUP_ID} .header {
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
         }
-        #menuTabs {
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 2px solid #007bff;
-            margin-bottom: 15px;
-        }
-        #menuTabs button {
-            background: none;
-            border: none;
+        #${POPUP_ID} .tab {
+            display: inline-block;
             padding: 10px;
             cursor: pointer;
-            color: #007bff;
-            font-weight: bold;
-            font-size: 14px;
-            border-radius: 6px;
-            transition: background-color 0.3s ease, color 0.3s ease;
         }
-        #menuTabs button.active {
-            border-bottom: 3px solid #007bff;
-            color: #0056b3;
+        #${POPUP_ID} .tab.active {
+            background: #007bff;
+            color: white;
         }
-        #menuTabs button:hover {
-            background-color: #f0f8ff;
-            color: #0056b3;
-        }
-        .menuContent {
-            display: none;
-        }
-        .menuContent.active {
-            display: block;
-        }
-        .county {
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
+        #${POPUP_ID} .content {
             padding: 10px;
-            background-color: #f9f9f9;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            color: #333;
-            transition: background-color 0.3s ease, box-shadow 0.3s ease;
         }
-        .county:hover {
-            background-color: #f0f8ff;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        #${POPUP_ID} .county {
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
         }
-        .countyData {
-            display: none;
-            margin-top: 8px;
-            padding: 8px;
-            border: 1px solid #eee;
-            border-radius: 6px;
-            background-color: #fafafa;
-            font-size: 13px;
-        }
-        .county.active .countyData {
-            display: block;
-        }
-        .searchBox {
-            margin-bottom: 15px;
-        }
-        .searchBox input {
-            width: 100%;
-            padding: 8px;
-            border-radius: 6px;
-            border: 1px solid #ddd;
-            font-size: 14px;
+        #${POPUP_ID} .county h4 {
+            margin: 0;
         }
     `);
 
-    const infoButton = document.createElement('div');
-    infoButton.id = 'infoButton';
-    document.body.appendChild(infoButton);
+    // Erstelle den Info-Button und das Popup
+    const createInfoButton = () => {
+        const button = document.createElement('div');
+        button.id = INFO_BUTTON_ID;
+        button.textContent = 'i';
+        document.body.appendChild(button);
+        button.addEventListener('click', togglePopup);
+    };
 
-    const popupMenu = document.createElement('div');
-    popupMenu.id = 'popupMenu';
-    document.body.appendChild(popupMenu);
+    const createPopup = () => {
+        const popup = document.createElement('div');
+        popup.id = POPUP_ID;
 
-    const menuTabs = document.createElement('div');
-    menuTabs.id = 'menuTabs';
-    menuTabs.innerHTML = `
-        <button id="trafficTab" class="active">Verkehrsdaten</button>
-        <button id="weatherTab">Wetterdaten</button>
-    `;
-    popupMenu.appendChild(menuTabs);
+        const header = document.createElement('div');
+        header.className = 'header';
+        header.textContent = 'Verkehrs- und Wetterdaten';
 
-    const searchBox = document.createElement('div');
-    searchBox.className = 'searchBox';
-    searchBox.innerHTML = '<input type="text" id="search" placeholder="Suche nach Landkreis...">';
-    popupMenu.appendChild(searchBox);
+        const trafficTab = document.createElement('div');
+        trafficTab.className = 'tab active';
+        trafficTab.textContent = 'Verkehrsdaten';
 
-    const trafficContent = document.createElement('div');
-    trafficContent.id = 'trafficContent';
-    trafficContent.className = 'menuContent active';
-    popupMenu.appendChild(trafficContent);
+        const weatherTab = document.createElement('div');
+        weatherTab.className = 'tab';
+        weatherTab.textContent = 'Wetterdaten';
 
-    const weatherContent = document.createElement('div');
-    weatherContent.id = 'weatherContent';
-    weatherContent.className = 'menuContent';
-    popupMenu.appendChild(weatherContent);
+        const content = document.createElement('div');
+        content.className = 'content';
 
-    const counties = [
-        'Alb-Donau-Kreis', 'Bodenseekreis', 'Breisgau-Hochschwarzwald', 'Böblingen',
-        'Esslingen', 'Göppingen', 'Heidenheim', 'Heilbronn', 'Hohenlohekreis', 'Karlsruhe',
-        'Ludwigsburg', 'Main-Tauber-Kreis', 'Neckar-Odenwald-Kreis', 'Ortenaukreis',
-        'Ostalbkreis', 'Pforzheim', 'Rastatt', 'Rems-Murr-Kreis', 'Reutlingen',
-        'Rhein-Neckar-Kreis', 'Rottweil', 'Schwäbisch Hall', 'Sigmaringen',
-        'Stuttgart', 'Tübingen', 'Ulm', 'Zollernalbkreis', 'Freiburg', 'Pforzheim', 'Lörrach'
-    ];
+        header.appendChild(trafficTab);
+        header.appendChild(weatherTab);
+        popup.appendChild(header);
+        popup.appendChild(content);
 
-    function getRandomTrafficStatus(county) {
-        const probabilities = {
-            'Freie Fahrt': 0.5,
-            'Stau': 0.2,
-            'Unfall': 0.15,
-            'Baustelle': 0.1,
-            'Verkehrsbehinderung': 0.05
+        document.body.appendChild(popup);
+
+        trafficTab.addEventListener('click', () => switchTab('traffic'));
+        weatherTab.addEventListener('click', () => switchTab('weather'));
+
+        // Füge initiale Inhalte hinzu
+        updateContent('traffic');
+    };
+
+    const togglePopup = () => {
+        const popup = document.getElementById(POPUP_ID);
+        if (popup.style.display === 'block') {
+            popup.style.display = 'none';
+        } else {
+            popup.style.display = 'block';
+            setTimeout(() => popup.style.display = 'none', DISPLAY_TIME);
+        }
+    };
+
+    const switchTab = (type) => {
+        const trafficTab = document.querySelector(`#${POPUP_ID} .tab:nth-child(1)`);
+        const weatherTab = document.querySelector(`#${POPUP_ID} .tab:nth-child(2)`);
+        const content = document.querySelector(`#${POPUP_ID} .content`);
+
+        if (type === 'traffic') {
+            trafficTab.classList.add('active');
+            weatherTab.classList.remove('active');
+            updateContent('traffic');
+        } else {
+            weatherTab.classList.add('active');
+            trafficTab.classList.remove('active');
+            updateContent('weather');
+        }
+    };
+
+    const updateContent = (type) => {
+        const content = document.querySelector(`#${POPUP_ID} .content`);
+        content.innerHTML = type === 'traffic' ? generateTrafficData() : generateWeatherData();
+    };
+
+    const generateTrafficData = () => {
+        // Beispielhafte Verkehrsstatus-Daten
+        const statuses = [
+            { status: 'Stau', duration: '45 Minuten' },
+            { status: 'Fließend', duration: '15 Minuten' },
+            { status: 'Leichter Verkehr', duration: '20 Minuten' },
+            { status: 'Baustelle', duration: '30 Minuten' },
+            { status: 'Sehr starkes Aufkommen', duration: '60 Minuten' },
+            { status: 'Unfall', duration: '50 Minuten' },
+            { status: 'Normal', duration: '10 Minuten' },
+            { status: 'Glätte', duration: '35 Minuten' },
+        ];
+
+        return counties.map(county => `
+            <div class="county">
+                <h4>${county}</h4>
+                <p>Status: ${statuses[Math.floor(Math.random() * statuses.length)].status}</p>
+                <p>Dauer: ${statuses[Math.floor(Math.random() * statuses.length)].duration}</p>
+            </div>
+        `).join('');
+    };
+
+    const generateWeatherData = () => {
+        // Beispielhafte Wetterdaten für jeden Monat
+        const months = {
+            Januar: [{ weather: 'Sonnig', temp: '5°C', humidity: '70%' }, { weather: 'Bewölkt', temp: '2°C', humidity: '80%' }],
+            Februar: [{ weather: 'Sonnig', temp: '6°C', humidity: '65%' }, { weather: 'Bewölkt', temp: '3°C', humidity: '75%' }],
+            März: [{ weather: 'Sonnig', temp: '10°C', humidity: '60%' }, { weather: 'Regen', temp: '9°C', humidity: '75%' }],
+            April: [{ weather: 'Sonnig', temp: '15°C', humidity: '55%' }, { weather: 'Regen', temp: '13°C', humidity: '70%' }],
+            Mai: [{ weather: 'Sonnig', temp: '20°C', humidity: '50%' }, { weather: 'Regen', temp: '19°C', humidity: '65%' }],
+            Juni: [{ weather: 'Sonnig', temp: '25°C', humidity: '45%' }, { weather: 'Gewitter', temp: '24°C', humidity: '65%' }],
+            Juli: [{ weather: 'Sonnig', temp: '30°C', humidity: '40%' }, { weather: 'Gewitter', temp: '30°C', humidity: '60%' }],
+            August: [{ weather: 'Sonnig', temp: '30°C', humidity: '45%' }, { weather: 'Regen', temp: '28°C', humidity: '60%' }],
+            September: [{ weather: 'Sonnig', temp: '25°C', humidity: '50%' }, { weather: 'Regen', temp: '23°C', humidity: '65%' }],
+            Oktober: [{ weather: 'Sonnig', temp: '15°C', humidity: '65%' }, { weather: 'Regen', temp: '13°C', humidity: '80%' }],
+            November: [{ weather: 'Sonnig', temp: '8°C', humidity: '75%' }, { weather: 'Schneefall', temp: '2°C', humidity: '90%' }],
+            Dezember: [{ weather: 'Sonnig', temp: '2°C', humidity: '80%' }, { weather: 'Schneefall', temp: '-3°C', humidity: '90%' }],
         };
 
-        if (county.includes('Stuttgart') || county.includes('Karlsruhe')) {
-            probabilities['Stau'] = 0.25;
-            probabilities['Unfall'] = 0.1;
-        }
+        return counties.map(county => `
+            <div class="county">
+                <h4>${county}</h4>
+                ${Object.keys(months).map(month => `
+                    <div>
+                        <h5>${month}</h5>
+                        <p>Wetterstatus: ${months[month][Math.floor(Math.random() * months[month].length)].weather}</p>
+                        <p>Temperatur: ${months[month][Math.floor(Math.random() * months[month].length)].temp}</p>
+                        <p>Luftfeuchtigkeit: ${months[month][Math.floor(Math.random() * months[month].length)].humidity}</p>
+                    </div>
+                `).join('')}
+            </div>
+        `).join('');
+    };
 
-        const r = Math.random();
-        let cumulativeProbability = 0;
+    // Initialisiere den Button und das Popup
+    createInfoButton();
+    createPopup();
 
-        for (const [status, probability] of Object.entries(probabilities)) {
-            cumulativeProbability += probability;
-            if (r < cumulativeProbability) {
-                return status;
-            }
-        }
-        return 'Freie Fahrt';
-    }
-
-    function getSeasonalWeatherData(month) {
-        let temperatures, weatherConditions;
-
-        if ([12, 1, 2].includes(month)) {
-            temperatures = [-3, 0, 2, 5];
-            weatherConditions = ['Schneefall', 'Bewölkt', 'Regnerisch', 'Klar'];
-        } else if ([3, 4, 5].includes(month)) {
-            temperatures = [8, 12, 14, 15];
-            weatherConditions = ['Sonnig', 'Bewölkt', 'Regnerisch', 'Leichter Regen'];
-        } else if ([6, 7, 8].includes(month)) {
-            temperatures = [18, 22, 25, 30];
-            weatherConditions = ['Sonnig', 'Heiß', 'Gewitter', 'Leicht Bewölkt'];
-        } else {
-            temperatures = [10, 12, 14, 8];
-            weatherConditions = ['Bewölkt', 'Regnerisch', 'Windig', 'Klar'];
-        }
-
-        const temperature = temperatures[Math.floor(Math.random() * temperatures.length)];
-        const condition = weatherConditions[Math.floor(Math.random() * weatherConditions.length)];
-
-        return { temperature, condition };
-    }
-
-    counties.forEach(county => {
-        const countyDiv = document.createElement('div');
-        countyDiv.className = 'county';
-        countyDiv.textContent = county;
-
-        const trafficData = document.createElement('div');
-        trafficData.className = 'countyData';
-        trafficData.innerHTML = `
-            <p><strong>Verkehr:</strong> ${getRandomTrafficStatus(county)}</p>
-        `;
-        countyDiv.appendChild(trafficData);
-        trafficContent.appendChild(countyDiv);
-
-        const weatherData = document.createElement('div');
-        weatherData.className = 'countyData';
-        weatherData.innerHTML = `
-            <p><strong>Wetter:</strong> ${
-                getSeasonalWeatherData(new Date().getMonth() + 1).condition
-            }, ${
-                getSeasonalWeatherData(new Date().getMonth() + 1).temperature
-            }°C</p>
-        `;
-        const weatherCountyDiv = countyDiv.cloneNode(true);
-        weatherCountyDiv.removeChild(weatherCountyDiv.firstChild); // remove traffic data from clone
-        weatherCountyDiv.appendChild(weatherData);
-        weatherContent.appendChild(weatherCountyDiv);
-
-        countyDiv.addEventListener('click', () => {
-            countyDiv.classList.toggle('active');
-        });
-
-        weatherCountyDiv.addEventListener('click', () => {
-            weatherCountyDiv.classList.toggle('active');
-        });
-    });
-
-    // Add functionality to tabs
-    const trafficTab = document.getElementById('trafficTab');
-    const weatherTab = document.getElementById('weatherTab');
-    const trafficTabContent = document.getElementById('trafficContent');
-    const weatherTabContent = document.getElementById('weatherContent');
-
-    trafficTab.addEventListener('click', () => {
-        trafficTab.classList.add('active');
-        weatherTab.classList.remove('active');
-        trafficTabContent.classList.add('active');
-        weatherTabContent.classList.remove('active');
-    });
-
-    weatherTab.addEventListener('click', () => {
-        weatherTab.classList.add('active');
-        trafficTab.classList.remove('active');
-        weatherTabContent.classList.add('active');
-        trafficTabContent.classList.remove('active');
-    });
-
-    // Add search functionality
-    const searchInput = document.getElementById('search');
-    searchInput.addEventListener('input', () => {
-        const filter = searchInput.value.toLowerCase();
-        const countyElements = document.querySelectorAll('.county');
-
-        countyElements.forEach(county => {
-            const text = county.textContent.toLowerCase();
-            county.style.display = text.includes(filter) ? '' : 'none';
-        });
-    });
-
-    // Add functionality to info button
-    infoButton.addEventListener('click', () => {
-        popupMenu.classList.toggle('show');
-    });
-
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(event) {
+    // Tastenkombinationen hinzufügen
+    document.addEventListener('keydown', (event) => {
         if (event.key === 'i') {
-            popupMenu.classList.toggle('show');
+            document.getElementById(INFO_BUTTON_ID).style.display = 'block';
         } else if (event.key === 'c') {
-            popupMenu.classList.remove('show');
+            togglePopup();
         }
     });
+
+    // Popup schließen, wenn außerhalb des Popups geklickt wird
+    document.addEventListener('click', (event) => {
+        if (!document.getElementById(POPUP_ID).contains(event.target) && !document.getElementById(INFO_BUTTON_ID).contains(event.target)) {
+            document.getElementById(POPUP_ID).style.display = 'none';
+        }
+    });
+
 })();
