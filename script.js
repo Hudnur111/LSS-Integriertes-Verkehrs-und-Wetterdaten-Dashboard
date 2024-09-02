@@ -1,8 +1,8 @@
- // ==UserScript==
+// ==UserScript==
 // @name         Leitstellenspiel Verkehrs- und Wetterdaten Dashboard
 // @namespace    https://www.leitstellenspiel.de/
-// @version      2.5
-// @description  Zeigt aktuelle Verkehrs- und Wetterdaten für Baden-Württemberg an, inklusive interaktiver Such- und Filterfunktionen.
+// @version      2.9
+// @description  Zeigt aktuelle Verkehrs- und Wetterdaten für Baden-Württemberg an, inklusive interaktiver Such- und Filterfunktionen, und einen Button, der bei Drücken von "i" für 1 Minute angezeigt wird und das Menü bei Drücken von "c" schließt.
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
 // @icon         https://www.leitstellenspiel.de/favicon.ico
@@ -16,10 +16,9 @@
 (function() {
     'use strict';
 
-    // Flag, um den Status des Popups zu verfolgen
     let isPopupVisible = false;
+    let buttonVisibleUntil = 0;
 
-    // CSS für das Popup, den Info-Button und Animationen
     GM_addStyle(`
         #infoButton {
             position: fixed;
@@ -29,40 +28,37 @@
             height: 50px;
             background-color: #007bff;
             border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             cursor: pointer;
             z-index: 10000;
-            transition: transform 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: none; /* Entfernt den Standardrahmen */
         }
         #infoButton:hover {
             transform: scale(1.1);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
         }
         #infoButton:active {
-            transform: scale(0.9);
-        }
-        #infoButton i {
-            color: white;
-            font-size: 24px;
+            transform: scale(0.95);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         }
         #popupMenu {
             position: fixed;
             bottom: 80px;
             right: 20px;
-            width: 320px;
-            max-height: 500px;
-            background-color: white;
+            width: 340px;
+            max-height: 600px;
+            background-color: #fff;
             border: 1px solid #007bff;
-            border-radius: 8px;
-            padding: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             z-index: 10000;
             overflow-y: auto;
             display: none;
             opacity: 0;
-            transition: opacity 0.5s ease, transform 0.5s ease;
-            transform: translateY(10px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            transform: translateY(20px);
         }
         #popupMenu.show {
             display: block;
@@ -72,8 +68,8 @@
         #menuTabs {
             display: flex;
             justify-content: space-between;
-            border-bottom: 1px solid #007bff;
-            margin-bottom: 10px;
+            border-bottom: 2px solid #007bff;
+            margin-bottom: 15px;
         }
         #menuTabs button {
             background: none;
@@ -82,15 +78,17 @@
             cursor: pointer;
             color: #007bff;
             font-weight: bold;
-            font-size: 16px;
-            border-radius: 4px;
-            transition: background-color 0.3s ease;
+            font-size: 14px;
+            border-radius: 6px;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
         #menuTabs button.active {
-            border-bottom: 2px solid #007bff;
+            border-bottom: 3px solid #007bff;
+            color: #0056b3;
         }
         #menuTabs button:hover {
             background-color: #f0f8ff;
+            color: #0056b3;
         }
         .menuContent {
             display: none;
@@ -101,11 +99,12 @@
         .county {
             font-weight: bold;
             cursor: pointer;
-            margin-top: 5px;
+            margin-top: 10px;
             border-bottom: 1px solid #eee;
-            padding: 5px;
+            padding: 8px;
             color: #333;
             transition: background-color 0.3s ease;
+            font-size: 14px;
         }
         .county:hover {
             background-color: #f0f8ff;
@@ -114,34 +113,33 @@
             display: none;
             margin-left: 15px;
             margin-top: 5px;
-            padding: 5px;
+            padding: 8px;
             border: 1px solid #eee;
-            border-radius: 4px;
+            border-radius: 6px;
             background-color: #fafafa;
             transition: max-height 0.3s ease;
+            font-size: 13px;
         }
         .searchBox {
-            margin-bottom: 10px;
+            margin-bottom: 15px;
         }
         .searchBox input {
             width: 100%;
-            padding: 5px;
-            border-radius: 4px;
+            padding: 8px;
+            border-radius: 6px;
             border: 1px solid #ddd;
+            font-size: 14px;
         }
     `);
 
-    // HTML für den Button und das Popup
     const infoButton = document.createElement('div');
     infoButton.id = 'infoButton';
-    infoButton.innerHTML = '<i>i</i>';
     document.body.appendChild(infoButton);
 
     const popupMenu = document.createElement('div');
     popupMenu.id = 'popupMenu';
     document.body.appendChild(popupMenu);
 
-    // Menüleiste hinzufügen
     const menuTabs = document.createElement('div');
     menuTabs.id = 'menuTabs';
     menuTabs.innerHTML = `
@@ -150,16 +148,14 @@
     `;
     popupMenu.appendChild(menuTabs);
 
-    // Suchleiste hinzufügen
     const searchBox = document.createElement('div');
     searchBox.className = 'searchBox';
     searchBox.innerHTML = '<input type="text" id="search" placeholder="Suche Landkreise...">';
     popupMenu.appendChild(searchBox);
 
-    // Container für die Menüdaten
     const trafficContent = document.createElement('div');
     trafficContent.id = 'trafficContent';
-    trafficContent.className = 'menuContent active'; // Startseite auf Verkehrsdaten
+    trafficContent.className = 'menuContent active'; 
     popupMenu.appendChild(trafficContent);
 
     const weatherContent = document.createElement('div');
@@ -167,7 +163,6 @@
     weatherContent.className = 'menuContent';
     popupMenu.appendChild(weatherContent);
 
-    // Landkreise und Dummy-Daten
     const counties = [
         'Alb-Donau-Kreis', 'Bodenseekreis', 'Breisgau-Hochschwarzwald', 'Böblingen',
         'Esslingen', 'Göppingen', 'Heidenheim', 'Heilbronn', 'Hohenlohekreis', 'Karlsruhe',
@@ -177,7 +172,6 @@
         'Stuttgart', 'Tübingen', 'Ulm', 'Zollernalbkreis', 'Freiburg', 'Pforzheim', 'Lörrach'
     ];
 
-    // Realistische Wahrscheinlichkeiten für Verkehrsdaten
     const trafficStatuses = [
         'Freie Fahrt', 'Stockender Verkehr', 'Stau', 'Unfall', 'Baustelle',
         'Umleitung', 'Geschwindigkeitsbegrenzung', 'Vollsperrung',
@@ -185,7 +179,6 @@
         'Verkehrsbehinderungen'
     ];
 
-    // Zufälligen Verkehrszustand basierend auf Wahrscheinlichkeiten generieren
     function getRandomTrafficStatus(county) {
         const probabilities = {
             'Stau': 0.1,
@@ -197,7 +190,7 @@
         };
 
         if (county.includes('Stuttgart') || county.includes('Karlsruhe')) {
-            probabilities['Stau'] = 0.25; // Höhere Wahrscheinlichkeit für große Städte
+            probabilities['Stau'] = 0.25;
             probabilities['Unfall'] = 0.1;
         }
 
@@ -211,10 +204,9 @@
             }
         }
 
-        return 'Freie Fahrt'; // Default-Wert
+        return 'Freie Fahrt';
     }
 
-    // Verkehrsdaten für jeden Landkreis erstellen
     function generateTrafficData() {
         trafficContent.innerHTML = counties.map(county => `
             <div class="county" data-county="${county}">
@@ -226,7 +218,6 @@
         `).join('');
     }
 
-    // Wetterdaten für jeden Landkreis erstellen (Dummy-Daten)
     function generateWeatherData() {
         weatherContent.innerHTML = counties.map(county => `
             <div class="county" data-county="${county}">
@@ -239,7 +230,6 @@
         `).join('');
     }
 
-    // Tab-Wechsel-Handler
     menuTabs.addEventListener('click', event => {
         const target = event.target;
         if (target.id === 'trafficTab') {
@@ -255,7 +245,6 @@
         }
     });
 
-    // Landkreis-Daten anzeigen/ausblenden
     popupMenu.addEventListener('click', event => {
         if (event.target.classList.contains('county')) {
             const dataDiv = event.target.querySelector('.countyData');
@@ -263,7 +252,6 @@
         }
     });
 
-    // Suchfunktion implementieren
     document.getElementById('search').addEventListener('input', event => {
         const searchText = event.target.value.toLowerCase();
         document.querySelectorAll('#popupMenu .county').forEach(countyDiv => {
@@ -272,13 +260,37 @@
         });
     });
 
-    // Button-Klick-Handler
     infoButton.addEventListener('click', () => {
         isPopupVisible = !isPopupVisible;
         popupMenu.classList.toggle('show', isPopupVisible);
     });
 
-    // Initialdaten generieren
+    document.addEventListener('keydown', event => {
+        if (event.key === 'i') {
+            buttonVisibleUntil = Date.now() + 60000;
+            infoButton.style.display = 'block';
+        } else if (event.key === 'c') {
+            isPopupVisible = false;
+            popupMenu.classList.remove('show');
+        }
+    });
+
+    function checkButtonVisibility() {
+        if (Date.now() > buttonVisibleUntil) {
+            infoButton.style.display = 'none';
+        }
+    }
+
+    setInterval(checkButtonVisibility, 1000);
+
+    infoButton.addEventListener('mouseover', () => {
+        buttonVisibleUntil = Date.now() + 60000;
+    });
+
+    infoButton.addEventListener('mouseout', () => {
+        buttonVisibleUntil = Date.now() - 1000;
+    });
+
     generateTrafficData();
     generateWeatherData();
 })();
