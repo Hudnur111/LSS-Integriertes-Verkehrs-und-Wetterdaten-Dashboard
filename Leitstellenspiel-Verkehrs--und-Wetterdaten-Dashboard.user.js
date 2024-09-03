@@ -21,7 +21,7 @@
 
     const SCRIPT_NAME = 'Leitstellenspiel Verkehrs- und Wetterdaten Dashboard';
     const CURRENT_VERSION = '2.9';
-    const UPDATE_URL = 'https://raw.githubusercontent.com/yourusername/yourrepository/main/yourscript.user.js'; // Ersetze durch deine GitHub-URL
+    const UPDATE_URL = '	https://github.com/Hudnur111/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard/raw/main/Leitstellenspiel-Verkehrs--und-Wetterdaten-Dashboard.user.js'; // Ersetze durch deine GitHub-URL
     const VERSION_URL = 'https://raw.githubusercontent.com/yourusername/yourrepository/main/version.txt'; // Ersetze durch deine GitHub-Version-Datei-URL
 
     function checkForUpdate() {
