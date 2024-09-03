@@ -2,7 +2,7 @@
 // @name         Leitstellenspiel Verkehrs- und Wetterdaten Dashboard
 // @namespace    https://www.leitstellenspiel.de/
 // @version      2.9
-// @description  Zeigt aktuelle Verkehrs- und Wetterdaten für Baden-Württemberg an, inklusive interaktiver Such- und Filterfunktionen, und zwei separate Menüs für Wetter- und Verkehrsdaten. Ein Button, der bei Drücken von "i" für 1 Minute angezeigt wird, und das Menü bei Drücken von "c" schließt, ist ebenfalls enthalten.
+// @description  Zeigt aktuelle Verkehrs- und Wetterdaten für Baden-Württemberg an, inklusive interaktiver Such- und Filterfunktionen. Zwei separate Menüs für Wetter- und Verkehrsdaten, mit einer Taste, die das Menü öffnet/schließt.
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
 // @icon         https://www.leitstellenspiel.de/favicon.ico
@@ -19,39 +19,6 @@
 (function() {
     'use strict';
 
-    const SCRIPT_NAME = 'Leitstellenspiel Verkehrs- und Wetterdaten Dashboard';
-    const CURRENT_VERSION = '2.9';
-    const UPDATE_URL = 'https://raw.githubusercontent.com/yourusername/yourrepository/main/yourscript.user.js'; // Ersetze durch deine GitHub-URL
-    const VERSION_URL = 'https://raw.githubusercontent.com/yourusername/yourrepository/main/version.txt'; // Ersetze durch deine GitHub-Version-Datei-URL
-
-    function checkForUpdate() {
-        GM_xmlhttpRequest({
-            method: 'GET',
-            url: VERSION_URL,
-            onload: function(response) {
-                if (response.status === 200) {
-                    const latestVersion = response.responseText.trim();
-                    if (latestVersion !== CURRENT_VERSION) {
-                        notifyUserForUpdate(latestVersion);
-                    }
-                }
-            }
-        });
-    }
-
-    function notifyUserForUpdate(latestVersion) {
-        GM_notification({
-            text: `${SCRIPT_NAME} (Version ${latestVersion}) Jetzt Aktualisieren!`,
-            title: 'Neue Version verfügbar',
-            onclick: function() {
-                window.open(UPDATE_URL, '_blank');
-            }
-        });
-    }
-
-    checkForUpdate();
-
-    // Liste aller Landkreise in Baden-Württemberg
     const counties = [
         'Alb-Donau-Kreis', 'Baden-Baden', 'Böblingen', 'Bodenseekreis', 'Breisgau-Hochschwarzwald', 
         'Enzkreis', 'Esslingen', 'Göppingen', 'Heidelberg', 'Heidenheim', 
@@ -63,7 +30,6 @@
         'Zollernalbkreis'
     ];
 
-    // Erstelle und style die Buttons
     GM_addStyle(`
         #infoButton {
             position: fixed;
@@ -84,7 +50,7 @@
         }
         #weatherPopup, #trafficPopup {
             position: fixed;
-            bottom: 10px;
+            bottom: 70px;
             right: 10px;
             width: 500px;
             height: 600px;
@@ -95,125 +61,68 @@
             z-index: 9999;
             overflow: auto;
         }
-        #weatherPopup .header, #trafficPopup .header {
+        .popup-header {
             background: #007bff;
             color: white;
             padding: 10px;
             text-align: center;
             font-weight: bold;
         }
-        #weatherPopup .county, #trafficPopup .county {
+        .popup-content .county {
             margin-bottom: 10px;
             border-bottom: 1px solid #ddd;
             cursor: pointer;
+            padding: 10px;
         }
-        #weatherPopup .county h4, #trafficPopup .county h4 {
+        .popup-content .county h4 {
             margin: 0;
         }
-        #weatherPopup .county .details, #trafficPopup .county .details {
+        .popup-content .county .details {
             display: none;
+            padding: 5px;
+            background-color: #f9f9f9;
         }
     `);
 
-    // Erstelle die Buttons und Popups für Wetter- und Verkehrsdaten
-    const createInfoButton = () => {
-        const button = document.createElement('div');
-        button.id = 'infoButton';
-        button.textContent = 'i';
-        document.body.appendChild(button);
-        button.addEventListener('click', togglePopups);
-    };
-
-    const createWeatherPopup = () => {
+    function createPopup(id, title) {
         const popup = document.createElement('div');
-        popup.id = 'weatherPopup';
+        popup.id = id;
+        popup.className = 'popup';
 
         const header = document.createElement('div');
-        header.className = 'header';
-        header.textContent = 'Wetterdaten';
+        header.className = 'popup-header';
+        header.textContent = title;
 
         const content = document.createElement('div');
-        content.className = 'content';
+        content.className = 'popup-content';
 
         popup.appendChild(header);
         popup.appendChild(content);
 
         document.body.appendChild(popup);
+        return popup;
+    }
 
-        updateWeatherContent();
-    };
+    const weatherPopup = createPopup('weatherPopup', 'Wetterdaten');
+    const trafficPopup = createPopup('trafficPopup', 'Verkehrsdaten');
 
-    const createTrafficPopup = () => {
-        const popup = document.createElement('div');
-        popup.id = 'trafficPopup';
-
-        const header = document.createElement('div');
-        header.className = 'header';
-        header.textContent = 'Verkehrsdaten';
-
-        const content = document.createElement('div');
-        content.className = 'content';
-
-        popup.appendChild(header);
-        popup.appendChild(content);
-
-        document.body.appendChild(popup);
-
-        updateTrafficContent();
-    };
-
-    const togglePopups = () => {
-        const weatherPopup = document.getElementById('weatherPopup');
-        const trafficPopup = document.getElementById('trafficPopup');
-
-        if (weatherPopup.style.display === 'block' || trafficPopup.style.display === 'block') {
-            weatherPopup.style.display = 'none';
-            trafficPopup.style.display = 'none';
-        } else {
-            weatherPopup.style.display = 'block';
-            trafficPopup.style.display = 'block';
-            setTimeout(() => {
-                weatherPopup.style.display = 'none';
-                trafficPopup.style.display = 'none';
-            }, 60000); // 1 Minute
-        }
-    };
-
-    const updateWeatherContent = () => {
-        const content = document.querySelector('#weatherPopup .content');
-        content.innerHTML = counties.map(county => `
+    function populatePopupContent(popupContent, dataGenerator) {
+        popupContent.innerHTML = counties.map(county => `
             <div class="county">
                 <h4>${county}</h4>
-                <div class="details">${generateWeatherDataForCounty()}</div>
+                <div class="details">${dataGenerator(county)}</div>
             </div>
         `).join('');
 
-        document.querySelectorAll('#weatherPopup .county').forEach(countyElement => {
+        popupContent.querySelectorAll('.county').forEach(countyElement => {
             countyElement.addEventListener('click', () => {
                 const details = countyElement.querySelector('.details');
                 details.style.display = details.style.display === 'block' ? 'none' : 'block';
             });
         });
-    };
+    }
 
-    const updateTrafficContent = () => {
-        const content = document.querySelector('#trafficPopup .content');
-        content.innerHTML = counties.map(county => `
-            <div class="county">
-                <h4>${county}</h4>
-                <div class="details">${generateTrafficDataForCounty()}</div>
-            </div>
-        `).join('');
-
-        document.querySelectorAll('#trafficPopup .county').forEach(countyElement => {
-            countyElement.addEventListener('click', () => {
-                const details = countyElement.querySelector('.details');
-                details.style.display = details.style.display === 'block' ? 'none' : 'block';
-            });
-        });
-    };
-
-    const generateWeatherDataForCounty = () => {
+    function generateWeatherDataForCounty(county) {
         const weatherData = {
             Wetterstatus: 'Sonnig',
             Temperatur: `${Math.floor(Math.random() * 15) + 15}°C`,
@@ -228,9 +137,9 @@
                 <p>Luftfeuchtigkeit: ${weatherData.Luftfeuchtigkeit}</p>
             </div>
         `;
-    };
+    }
 
-    const generateTrafficDataForCounty = () => {
+    function generateTrafficDataForCounty(county) {
         const trafficStatuses = [
             { status: 'Stau', duration: '45 Minuten' },
             { status: 'Fließend', duration: 'Keine Verzögerung' },
@@ -244,29 +153,42 @@
                 <p>Dauer: ${trafficStatuses[Math.floor(Math.random() * trafficStatuses.length)].duration}</p>
             </div>
         `;
-    };
+    }
 
-    // Initialisiere den Button und die Popups
-    createInfoButton();
-    createWeatherPopup();
-    createTrafficPopup();
+    populatePopupContent(weatherPopup.querySelector('.popup-content'), generateWeatherDataForCounty);
+    populatePopupContent(trafficPopup.querySelector('.popup-content'), generateTrafficDataForCounty);
 
-    // Tastenkombinationen hinzufügen
+    const infoButton = document.createElement('div');
+    infoButton.id = 'infoButton';
+    infoButton.textContent = 'i';
+    document.body.appendChild(infoButton);
+
+    infoButton.addEventListener('click', () => {
+        const isWeatherVisible = weatherPopup.style.display === 'block';
+        const isTrafficVisible = trafficPopup.style.display === 'block';
+
+        weatherPopup.style.display = isWeatherVisible ? 'none' : 'block';
+        trafficPopup.style.display = isTrafficVisible ? 'none' : 'block';
+
+        setTimeout(() => {
+            weatherPopup.style.display = 'none';
+            trafficPopup.style.display = 'none';
+        }, 60000); // 1 Minute
+    });
+
     document.addEventListener('keydown', (event) => {
         if (event.key === 'i') {
-            document.getElementById('infoButton').style.display = 'block';
+            infoButton.style.display = 'block';
         } else if (event.key === 'c') {
-            togglePopups();
+            weatherPopup.style.display = 'none';
+            trafficPopup.style.display = 'none';
         }
     });
 
-    // Popups schließen, wenn außerhalb des Popups geklickt wird
     document.addEventListener('click', (event) => {
-        if (!document.getElementById('weatherPopup').contains(event.target) && !document.getElementById('infoButton').contains(event.target) && 
-            !document.getElementById('trafficPopup').contains(event.target)) {
-            document.getElementById('weatherPopup').style.display = 'none';
-            document.getElementById('trafficPopup').style.display = 'none';
+        if (!weatherPopup.contains(event.target) && !infoButton.contains(event.target) && !trafficPopup.contains(event.target)) {
+            weatherPopup.style.display = 'none';
+            trafficPopup.style.display = 'none';
         }
     });
-
 })();
