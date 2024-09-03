@@ -19,9 +19,9 @@
 
     // Liste aller Landkreise in Baden-Württemberg
     const counties = [
-        'Alb-Donau-Kreis', 'Baden-Baden', 'Böblingen', 'Heilbronn', 'Karlsruhe', 
-        'Kreis Biberach', 'Kreis Konstanz', 'Kreis Esslingen', 'Kreis Ravensburg', 
-        'Kreis Rems-Murr', 'Kreis Rottweil', 'Kreis Tübingen', 'Kreis Ulm', 
+        'Alb-Donau-Kreis', 'Baden-Baden', 'Böblingen', 'Baden-Württemberg', 'Baden-Württemberg', 
+        'Heilbronn', 'Karlsruhe', 'Kreis Biberach', 'Kreis Konstanz', 'Kreis Esslingen', 
+        'Kreis Ravensburg', 'Kreis Rems-Murr', 'Kreis Rottweil', 'Kreis Tübingen', 'Kreis Ulm', 
         'Ortenaukreis', 'Pforzheim', 'Stuttgart', 'Zollernalbkreis'
     ];
 
