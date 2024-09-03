@@ -53,10 +53,14 @@
 
     // Liste aller Landkreise in Baden-Württemberg
     const counties = [
-        'Alb-Donau-Kreis', 'Baden-Baden', 'Böblingen', 'Baden-Württemberg', 'Baden-Württemberg', 
-        'Heilbronn', 'Karlsruhe', 'Kreis Biberach', 'Kreis Konstanz', 'Kreis Esslingen', 
-        'Kreis Ravensburg', 'Kreis Rems-Murr', 'Kreis Rottweil', 'Kreis Tübingen', 'Kreis Ulm', 
-        'Ortenaukreis', 'Pforzheim', 'Stuttgart', 'Zollernalbkreis'
+        'Alb-Donau-Kreis', 'Baden-Baden', 'Böblingen', 'Bodenseekreis', 'Breisgau-Hochschwarzwald', 
+        'Enzkreis', 'Esslingen', 'Göppingen', 'Heidelberg', 'Heidenheim', 
+        'Heilbronn', 'Hohenlohekreis', 'Karlsruhe', 'Konstanz', 'Lörrach', 
+        'Ludwigsburg', 'Main-Tauber-Kreis', 'Neckar-Odenwald-Kreis', 'Ortenaukreis', 'Ostalbkreis', 
+        'Pforzheim', 'Rastatt', 'Ravensburg', 'Rems-Murr-Kreis', 'Reutlingen', 
+        'Rhein-Neckar-Kreis', 'Rottweil', 'Schwäbisch Hall', 'Schwarzwald-Baar-Kreis', 'Sigmaringen', 
+        'Stuttgart', 'Tübingen', 'Tuttlingen', 'Ulm', 'Waldshut', 
+        'Zollernalbkreis'
     ];
 
     // Erstelle und style die Buttons
@@ -229,13 +233,8 @@
     const generateTrafficDataForCounty = () => {
         const trafficStatuses = [
             { status: 'Stau', duration: '45 Minuten' },
-            { status: 'Fließend', duration: '15 Minuten' },
-            { status: 'Leichter Verkehr', duration: '20 Minuten' },
-            { status: 'Baustelle', duration: '30 Minuten' },
-            { status: 'Sehr starkes Aufkommen', duration: '60 Minuten' },
-            { status: 'Unfall', duration: '50 Minuten' },
-            { status: 'Normal', duration: '10 Minuten' },
-            { status: 'Glätte', duration: '35 Minuten' },
+            { status: 'Fließend', duration: 'Keine Verzögerung' },
+            { status: 'Unfall', duration: '20 Minuten Verzögerung' }
         ];
 
         return `
