@@ -53,7 +53,8 @@
 
     // Erstelle und style den Info-Button
     GM_addStyle(`
-        #${INFO_BUTTON_ID} {
+      #${INFO_BUTTON_ID} {
+            display: none; /* Button zunächst unsichtbar */
             position: fixed;
             bottom: 10px;
             right: 10px;
@@ -285,21 +286,30 @@
     createInfoButton();
     createPopup();
 
-    // Schließe Popup, wenn der Nutzer auf einen Bereich außerhalb klickt
-    document.addEventListener('click', (event) => {
-        if (!event.target.closest(`#${INFO_BUTTON_ID}`) && !event.target.closest(`#${POPUP_ID}`)) {
-            const popup = document.getElementById(POPUP_ID);
-            if (popup.style.display === 'block') {
-                popup.style.display = 'none';
-            }
+  // Funktion zum automatischen Verstecken nach 2 Minuten Inaktivität
+    const resetTimeout = () => {
+        clearTimeout(timeoutId);
+timeoutId = setTimeout(hidePopupAndButton, 1 * 60 * 1000); // 1 Minute
+    };
+
+    const hidePopupAndButton = () => {
+        document.getElementById(POPUP_ID).style.display = 'none';
+        document.getElementById(INFO_BUTTON_ID).style.display = 'none';
+    };
+
+    // Zeige den Info-Button bei Drücken von "i"
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'i') {
+            const button = document.getElementById(INFO_BUTTON_ID);
+            button.style.display = 'block';
+            resetTimeout(); // Reset der automatischen Schließung
+        } else if (e.key === 'c') {
+            togglePopup(); // Schließe das Popup bei Drücken von "c"
         }
     });
 
-    // Schließe Popup, wenn der Nutzer 'c' drückt
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'c') {
-            const popup = document.getElementById(POPUP_ID);
-            popup.style.display = 'none';
-        }
-    });
+    // Erstelle Info-Button und Popup beim Laden der Seite
+    createInfoButton();
+    createPopup();
 })();
+
