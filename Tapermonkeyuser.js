@@ -8,8 +8,8 @@
 // @icon         https://www.leitstellenspiel.de/favicon.ico
 // @grant        GM_addStyle
 // @license      GPL-3.0-or-later
-// @updateURL    https://raw.githubusercontent.com/DEIN_USERNAME/leitstellenspiel-dashboard/main/leitstellenspiel-dashboard.user.js
-// @downloadURL  https://raw.githubusercontent.com/DEIN_USERNAME/leitstellenspiel-dashboard/main/leitstellenspiel-dashboard.user.js
+// @updateURL    https://raw.githubusercontent.com/Hudnur111/LSS-Integriertes-Verkehrs-und-Wetterdaten-Dashboard/refs/heads/main/Tapermonkeyuser.js
+// @downloadURL  https://raw.githubusercontent.com/Hudnur111/LSS-Integriertes-Verkehrs-und-Wetterdaten-Dashboard/refs/heads/main/Tapermonkeyuser.js
 // ==/UserScript==
 
 
