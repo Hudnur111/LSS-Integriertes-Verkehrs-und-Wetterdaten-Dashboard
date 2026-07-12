@@ -4,7 +4,7 @@ Ein Fan-Mod für das [Leitstellenspiel](https://www.leitstellenspiel.de/), der *
 
 ## 🧩 Wie der Mod funktioniert
 
-1. **Popup im Spiel** – Ein kleiner Button (⛅) schwebt unten rechts über der Leitstellenspiel-Seite. Er zeigt permanent ein farbiges **Risiko-Badge** (grün/gelb/orange/rot) an, auch ohne das Popup zu öffnen. Ein Klick öffnet ein kompaktes Popup mit aktueller Temperatur, Wetterlage und (optional) Verkehrsauslastung für eine wählbare Stadt.
+1. **Popup im Spiel** – Ein kleiner Button (⛅) schwebt unten links über der Leitstellenspiel-Seite. Er zeigt permanent ein farbiges **Risiko-Badge** (grün/gelb/orange/rot) an, auch ohne das Popup zu öffnen. Ein Klick öffnet ein kompaktes Popup mit aktueller Temperatur, Wetterlage und (optional) Verkehrsauslastung für eine wählbare Stadt.
 2. **Detail-Dashboard** – Der Button *„Vollständiges Dashboard öffnen“* im Popup öffnet in einem neuen Tab `index.html` mit vollständigen Details: Einsatzrisiko-Index, 5-Tage-Wettervorhersage, 24h-Temperaturtrend, Luftqualität, Live-Verkehrskarte, Verkehrsmeldungen und Messpunkten rund um die Stadt.
 
 Beide Teile nutzen **echte APIs**, keine simulierten Zufallsdaten:
@@ -28,7 +28,7 @@ Ist kein TomTom-Key hinterlegt, läuft der Verkehrsteil in einem klar gekennzeic
 1. Browser-Erweiterung [Tampermonkey](https://www.tampermonkey.net/) installieren.
 2. Datei [`mod/lss-verkehr-wetter-mod.user.js`](mod/lss-verkehr-wetter-mod.user.js) öffnen und über Tampermonkey installieren (bzw. Inhalt in ein neues Userscript einfügen).
 3. Falls das Dashboard nicht über die Standard-GitHub-Pages-URL erreichbar ist, die Konstante `DASHBOARD_URL` am Anfang des Scripts anpassen.
-4. Leitstellenspiel öffnen – der ⛅-Button erscheint unten rechts.
+4. Leitstellenspiel öffnen – der ⛅-Button erscheint unten links.
 
 ### 3. Echte Verkehrsdaten aktivieren (optional)
 1. Kostenlosen Account auf [developer.tomtom.com](https://developer.tomtom.com/) anlegen und einen API-Key erzeugen (Free-Tier reicht für den privaten Gebrauch).

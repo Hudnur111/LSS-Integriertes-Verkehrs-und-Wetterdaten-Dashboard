@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         LSS Verkehr & Wetter Mod
 // @namespace    https://github.com/Hudnur111/LSS-Integriertes-Verkehrs-und-Wetterdaten-Dashboard
-// @version      2.1.0
+// @version      2.1.1
 // @description  Zeigt ein kompaktes Live-Wetter- und Verkehrs-Popup mit Einsatzrisiko-Badge im Leitstellenspiel. Ein Klick öffnet das vollständige Dashboard mit Detaildaten in einem neuen Tab.
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
@@ -120,7 +120,7 @@
     const style = document.createElement('style');
     style.textContent = `
       #lss-mod-fab {
-        position: fixed; bottom: 20px; right: 20px; z-index: 99999;
+        position: fixed; bottom: 20px; left: 20px; z-index: 99999;
         width: 56px; height: 56px; border-radius: 50%;
         background: linear-gradient(135deg, #1d4ed8, #1e293b);
         color: #fff; display: flex; align-items: center; justify-content: center;
@@ -138,7 +138,7 @@
         display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11px; color: #6b7280;
       }
       #lss-mod-panel {
-        position: fixed; bottom: 86px; right: 20px; z-index: 99999;
+        position: fixed; bottom: 86px; left: 20px; z-index: 99999;
         width: 300px; background: #fff; border-radius: 12px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.35); font-family: system-ui, sans-serif;
         overflow: hidden; display: none; color: #1f2937;
