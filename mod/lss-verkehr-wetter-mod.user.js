@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         LSS Verkehr & Wetter Mod
 // @namespace    https://github.com/Hudnur111/LSS-Integriertes-Verkehrs-und-Wetterdaten-Dashboard
-// @version      2.0.0
-// @description  Zeigt ein kompaktes Live-Wetter- und Verkehrs-Popup im Leitstellenspiel. Ein Klick öffnet das vollständige Dashboard mit Detaildaten in einem neuen Tab.
+// @version      2.1.0
+// @description  Zeigt ein kompaktes Live-Wetter- und Verkehrs-Popup mit Einsatzrisiko-Badge im Leitstellenspiel. Ein Klick öffnet das vollständige Dashboard mit Detaildaten in einem neuen Tab.
 // @author       Hudnur111
 // @match        https://www.leitstellenspiel.de/*
 // @match        https://*.leitstellenspiel.de/*
@@ -52,6 +52,41 @@
     return WEATHER_CODES[code] || ['❓', 'Unbekannt'];
   }
 
+  // Vereinfachte Variante des Einsatzrisiko-Index aus dem Detail-Dashboard.
+  function computeSimpleRisk(weatherCode, windSpeed, tempNow, congestionPct) {
+    let score = 0;
+    if ([95, 96, 99].includes(weatherCode)) score += 35;
+    if (windSpeed >= 75) score += 35;
+    else if (windSpeed >= 50) score += 20;
+    if ([65, 82].includes(weatherCode)) score += 25;
+    if (tempNow <= 2 && [51, 53, 55, 61, 63, 66, 67, 71, 73, 75, 77, 85, 86].includes(weatherCode)) score += 30;
+    if ([45, 48].includes(weatherCode)) score += 10;
+    if (congestionPct != null && congestionPct >= 60) score += 15;
+    score = Math.max(0, Math.min(100, score));
+
+    let level, color;
+    if (score < 25) { level = 'Niedrig'; color = '#22c55e'; }
+    else if (score < 50) { level = 'Mittel'; color = '#eab308'; }
+    else if (score < 75) { level = 'Hoch'; color = '#f97316'; }
+    else { level = 'Sehr hoch'; color = '#dc2626'; }
+    return { score, level, color };
+  }
+
+  let lastRiskLevel = null;
+
+  function maybeNotify(risk) {
+    const enabled = GM_getValue('lss_mod_notify_enabled', false);
+    const isElevated = risk.level === 'Hoch' || risk.level === 'Sehr hoch';
+    const wasElevated = lastRiskLevel === 'Hoch' || lastRiskLevel === 'Sehr hoch';
+    if (enabled && isElevated && !wasElevated && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification('LSS Einsatzrisiko: ' + risk.level, {
+        body: `Aktuelles Risiko in ${getSelectedCity()}: ${risk.score}/100`,
+        icon: 'https://www.leitstellenspiel.de/favicon.ico',
+      });
+    }
+    lastRiskLevel = risk.level;
+  }
+
   function gmFetch(url) {
     return new Promise((resolve, reject) => {
       GM_xmlhttpRequest({
@@ -92,6 +127,15 @@
         font-size: 26px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.35);
         border: 2px solid rgba(255,255,255,0.2);
         font-family: system-ui, sans-serif;
+      }
+      #lss-mod-fab-badge {
+        position: absolute; top: -2px; right: -2px; width: 16px; height: 16px;
+        border-radius: 50%; background: #6b7280; border: 2px solid #fff;
+        display: none;
+      }
+      #lss-mod-fab-badge.visible { display: block; }
+      #lss-mod-panel .lss-notify-row {
+        display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11px; color: #6b7280;
       }
       #lss-mod-panel {
         position: fixed; bottom: 86px; right: 20px; z-index: 99999;
@@ -139,6 +183,9 @@
       <div class="lss-body">
         <div id="lss-mod-content">Lade...</div>
         <button class="lss-open-btn" id="lss-mod-open-dashboard">Vollständiges Dashboard öffnen ↗</button>
+        <label class="lss-notify-row">
+          <input type="checkbox" id="lss-mod-notify-toggle"> Benachrichtigung bei hohem Einsatzrisiko
+        </label>
         <span class="lss-footer-link" id="lss-mod-settings-link">Verkehrs-API-Key einrichten</span>
       </div>
     `;
@@ -168,6 +215,15 @@
       window.open(url, '_blank');
     });
 
+    const notifyToggle = panel.querySelector('#lss-mod-notify-toggle');
+    notifyToggle.checked = GM_getValue('lss_mod_notify_enabled', false);
+    notifyToggle.addEventListener('change', () => {
+      GM_setValue('lss_mod_notify_enabled', notifyToggle.checked);
+      if (notifyToggle.checked && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    });
+
     panel.querySelector('#lss-mod-settings-link').addEventListener('click', () => {
       const current = getTomTomKey();
       const key = window.prompt(
@@ -187,51 +243,57 @@
     const fab = document.createElement('div');
     fab.id = 'lss-mod-fab';
     fab.title = 'Wetter & Verkehr';
-    fab.textContent = '⛅';
+    fab.innerHTML = '⛅<span id="lss-mod-fab-badge"></span>';
     document.body.appendChild(fab);
     return fab;
   }
 
-  async function loadData() {
+  async function loadData(silent) {
     const content = document.querySelector('#lss-mod-content');
-    if (!content) return;
-    content.innerHTML = 'Lade...';
+    if (!silent && content) content.innerHTML = 'Lade...';
 
     const name = getSelectedCity();
     const { lat, lon } = CITIES[name];
 
     let weatherHtml = '<p>Wetterdaten nicht verfügbar.</p>';
+    let weatherCode = null;
+    let windSpeed = null;
+    let tempNow = null;
     try {
       const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m`;
       const data = await gmFetch(weatherUrl);
-      const [emoji, label] = weatherEmoji(data.current.weather_code);
+      weatherCode = data.current.weather_code;
+      windSpeed = data.current.wind_speed_10m;
+      tempNow = data.current.temperature_2m;
+      const [emoji, label] = weatherEmoji(weatherCode);
       weatherHtml = `
         <div class="lss-row">
           <span>${emoji} ${label}</span>
-          <span class="lss-big">${Math.round(data.current.temperature_2m)}°C</span>
+          <span class="lss-big">${Math.round(tempNow)}°C</span>
         </div>
-        <div class="lss-row"><span>Wind</span><span>${Math.round(data.current.wind_speed_10m)} km/h</span></div>
+        <div class="lss-row"><span>Wind</span><span>${Math.round(windSpeed)} km/h</span></div>
       `;
     } catch (e) {
       // stumm fehlschlagen, Platzhalter bleibt
     }
 
     let trafficHtml = '<div class="lss-row"><span>Verkehr</span><span style="color:#9ca3af">Kein API-Key</span></div>';
+    let congestionPct = null;
     const key = getTomTomKey();
     if (key) {
       try {
         const flowUrl = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${lat},${lon}&key=${encodeURIComponent(key)}`;
         const flow = await gmFetch(flowUrl);
         const fsd = flow.flowSegmentData;
-        const pct = Math.max(0, Math.min(100, Math.round(100 - (fsd.currentSpeed / fsd.freeFlowSpeed) * 100)));
+        congestionPct = Math.max(0, Math.min(100, Math.round(100 - (fsd.currentSpeed / fsd.freeFlowSpeed) * 100)));
         let color = '#22c55e';
-        if (pct >= 60) color = '#dc2626';
-        else if (pct >= 35) color = '#f97316';
-        else if (pct >= 15) color = '#eab308';
+        if (congestionPct >= 60) color = '#dc2626';
+        else if (congestionPct >= 35) color = '#f97316';
+        else if (congestionPct >= 15) color = '#eab308';
         trafficHtml = `
           <div class="lss-row">
             <span>Verkehr</span>
-            <span class="lss-badge" style="background:${color}">${pct}% Auslastung</span>
+            <span class="lss-badge" style="background:${color}">${congestionPct}% Auslastung</span>
           </div>
           <div class="lss-row"><span>Geschwindigkeit</span><span>${Math.round(fsd.currentSpeed)} km/h</span></div>
         `;
@@ -240,7 +302,18 @@
       }
     }
 
-    content.innerHTML = weatherHtml + trafficHtml;
+    if (content) content.innerHTML = weatherHtml + trafficHtml;
+
+    if (weatherCode !== null) {
+      const risk = computeSimpleRisk(weatherCode, windSpeed, tempNow, congestionPct);
+      const badge = document.querySelector('#lss-mod-fab-badge');
+      if (badge) {
+        badge.classList.add('visible');
+        badge.style.background = risk.color;
+        badge.title = `Einsatzrisiko: ${risk.level} (${risk.score}/100)`;
+      }
+      maybeNotify(risk);
+    }
   }
 
   function init() {
@@ -253,9 +326,11 @@
       if (panel.classList.contains('open')) loadData();
     });
 
-    // Auto-refresh alle 5 Minuten, solange das Popup offen ist
+    loadData(true);
+
+    // Aktualisiert Popup-Inhalt (falls offen) und Risiko-Badge alle 5 Minuten
     setInterval(() => {
-      if (panel.classList.contains('open')) loadData();
+      loadData(!panel.classList.contains('open'));
     }, 5 * 60 * 1000);
   }
 

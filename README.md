@@ -4,14 +4,15 @@ Ein Fan-Mod für das [Leitstellenspiel](https://www.leitstellenspiel.de/), der *
 
 ## 🧩 Wie der Mod funktioniert
 
-1. **Popup im Spiel** – Ein kleiner Button (⛅) schwebt unten rechts über der Leitstellenspiel-Seite. Ein Klick öffnet ein kompaktes Popup mit aktueller Temperatur, Wetterlage und (optional) Verkehrsauslastung für eine wählbare Stadt.
-2. **Detail-Dashboard** – Der Button *„Vollständiges Dashboard öffnen“* im Popup öffnet in einem neuen Tab `index.html` mit vollständigen Details: 5-Tage-Wettervorhersage, Live-Verkehrskarte, Verkehrsmeldungen und Messpunkten rund um die Stadt.
+1. **Popup im Spiel** – Ein kleiner Button (⛅) schwebt unten rechts über der Leitstellenspiel-Seite. Er zeigt permanent ein farbiges **Risiko-Badge** (grün/gelb/orange/rot) an, auch ohne das Popup zu öffnen. Ein Klick öffnet ein kompaktes Popup mit aktueller Temperatur, Wetterlage und (optional) Verkehrsauslastung für eine wählbare Stadt.
+2. **Detail-Dashboard** – Der Button *„Vollständiges Dashboard öffnen“* im Popup öffnet in einem neuen Tab `index.html` mit vollständigen Details: Einsatzrisiko-Index, 5-Tage-Wettervorhersage, 24h-Temperaturtrend, Luftqualität, Live-Verkehrskarte, Verkehrsmeldungen und Messpunkten rund um die Stadt.
 
 Beide Teile nutzen **echte APIs**, keine simulierten Zufallsdaten:
 
 | Datenart | Quelle | API-Key nötig? |
 |---|---|---|
-| 🌦️ Wetter (aktuell + Vorhersage) | [Open-Meteo](https://open-meteo.com/) | Nein |
+| 🌦️ Wetter (aktuell + Vorhersage + Sonnenauf-/-untergang + UV) | [Open-Meteo](https://open-meteo.com/) | Nein |
+| 🌫️ Luftqualität (PM2.5, PM10, EAQI) | [Open-Meteo Air Quality API](https://open-meteo.com/en/docs/air-quality-api) | Nein |
 | 🚗 Verkehrsfluss & Meldungen | [TomTom Traffic API](https://developer.tomtom.com/) | Ja (kostenloses Kontingent) |
 | 🗺️ Karte | [OpenStreetMap](https://www.openstreetmap.org/) via Leaflet | Nein |
 
@@ -32,17 +33,24 @@ Ist kein TomTom-Key hinterlegt, läuft der Verkehrsteil in einem klar gekennzeic
 ### 3. Echte Verkehrsdaten aktivieren (optional)
 1. Kostenlosen Account auf [developer.tomtom.com](https://developer.tomtom.com/) anlegen und einen API-Key erzeugen (Free-Tier reicht für den privaten Gebrauch).
 2. Im Popup auf *„Verkehrs-API-Key einrichten“* klicken und den Key eintragen, **oder** im Detail-Dashboard über das ⚙️-Icon.
-3. Der Key wird lokal gespeichert (Tampermonkey-Storage bzw. `localStorage`) und nie an Dritte übermittelt.
+3. Der Key wird lokal gespeichert (Tampermonkey-Storage bzw. `localStorage`) und nie an Dritte übermittelt. Popup und Dashboard nutzen getrennte Speicherorte – der Key muss ggf. an beiden Stellen einmalig hinterlegt werden.
 
 ## 🔧 Features
 
-- 📍 Auswahl aus 14 großen deutschen Städten (Berlin, Hamburg, München, Köln, ...)
-- 🌦️ Echtzeit-Wetter inkl. gefühlter Temperatur, Wind, Luftfeuchtigkeit, Sichtweite
+- 📍 Auswahl aus 14 großen deutschen Städten (Berlin, Hamburg, München, Köln, ...) oder **eigener Standort** per Geolocation
+- 🌦️ Echtzeit-Wetter inkl. gefühlter Temperatur, Windrichtung (Kompass), Luftfeuchtigkeit, Sichtweite, Sonnenauf-/-untergang, UV-Index
+- 📈 24-Stunden-Temperaturtrend als Sparkline-Chart
 - 📅 5-Tage-Wettervorhersage mit Regenwahrscheinlichkeit
+- 🌫️ Luftqualität (EAQI, PM2.5, PM10)
 - 🚦 Live-Verkehrsauslastung (Geschwindigkeit vs. freie Fließgeschwindigkeit)
 - 📣 Echte Verkehrsmeldungen (Unfälle, Baustellen, Sperrungen) auf Karte & Liste
 - 🗺️ Interaktive Karte mit Live-Marker für gemeldete Vorfälle
-- 🔁 Auto-Refresh alle 10 Minuten (Dashboard) bzw. 5 Minuten (Popup)
+- ⚠️ **Einsatzrisiko-Index**: heuristische Einschätzung (0–100), die Wetter- und Verkehrsdaten zu konkreten LSS-Einsatzvorschlägen verdichtet (z. B. „Verkehrsunfälle durch Glätte“, „Sturmschaden“, „Land unter“)
+- 🔴 **Risiko-Badge direkt am In-Game-Button** – auf einen Blick erkennbar, ohne das Popup zu öffnen
+- 🔔 Optionale Browser-Benachrichtigung, wenn das Einsatzrisiko auf „Hoch“/„Sehr hoch“ steigt
+- 🌓 Dark Mode (folgt Systemeinstellung, manuell umschaltbar)
+- 📋 „In Zwischenablage kopieren“-Button für eine schnelle Lage-Zusammenfassung (z. B. für Discord/Allianz-Chat)
+- 🔁 Auto-Refresh alle 10 Minuten (Dashboard) bzw. 5 Minuten (Popup, inkl. Risiko-Badge im Hintergrund)
 - 🧭 Deep-Link: Popup übergibt Stadt/Koordinaten per URL an das Dashboard
 
 ## 🛠️ Verwendete Technologien

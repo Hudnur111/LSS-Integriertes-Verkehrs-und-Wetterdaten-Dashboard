@@ -9,7 +9,17 @@
   const STORAGE_KEYS = {
     city: 'lss_dashboard_city',
     tomtomKey: 'lss_dashboard_tomtom_key',
+    theme: 'lss_dashboard_theme',
   };
+
+  const AQI_LEVELS = [
+    { max: 20, label: 'Gut', color: 'bg-green-500' },
+    { max: 40, label: 'Mäßig', color: 'bg-yellow-500' },
+    { max: 60, label: 'Mittel', color: 'bg-orange-500' },
+    { max: 80, label: 'Schlecht', color: 'bg-red-600' },
+    { max: 100, label: 'Sehr schlecht', color: 'bg-purple-700' },
+    { max: Infinity, label: 'Extrem', color: 'bg-purple-900' },
+  ];
 
   const CITIES = {
     'Berlin': { lat: 52.5200, lon: 13.4050 },
@@ -69,6 +79,8 @@
     mapMarker: null,
     incidentMarkers: [],
     refreshTimer: null,
+    lastWeather: null,
+    lastCongestionPct: null,
   };
 
   function weatherInfo(code) {
@@ -140,12 +152,12 @@
     url.searchParams.set('longitude', lon);
     url.searchParams.set(
       'current',
-      'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,weather_code,cloud_cover'
+      'temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover,precipitation'
     );
-    url.searchParams.set('hourly', 'visibility,temperature_2m,weather_code');
+    url.searchParams.set('hourly', 'visibility,temperature_2m,weather_code,precipitation_probability');
     url.searchParams.set(
       'daily',
-      'temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max'
+      'temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max,sunrise,sunset,uv_index_max'
     );
     url.searchParams.set('timezone', 'Europe/Berlin');
     url.searchParams.set('forecast_days', '5');
@@ -155,24 +167,37 @@
     return res.json();
   }
 
-  function currentHourlyValue(hourly, field) {
-    if (!hourly || !hourly.time || !hourly[field]) return null;
+  function currentHourlyIndex(hourly) {
+    if (!hourly || !hourly.time) return 0;
     const now = new Date();
     const roundedHourIso = new Date(
       now.getFullYear(), now.getMonth(), now.getDate(), now.getHours()
     ).toISOString().slice(0, 13);
     const idx = hourly.time.findIndex((t) => t.slice(0, 13) === roundedHourIso);
-    const useIdx = idx === -1 ? 0 : idx;
-    return hourly[field][useIdx];
+    return idx === -1 ? 0 : idx;
+  }
+
+  function currentHourlyValue(hourly, field) {
+    if (!hourly || !hourly[field]) return null;
+    return hourly[field][currentHourlyIndex(hourly)];
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '–';
+    return new Date(iso).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   }
 
   function renderWeather(data) {
     const c = data.current;
+    const d = data.daily;
     const [icon, label] = weatherInfo(c.weather_code);
     const visibility = currentHourlyValue(data.hourly, 'visibility');
 
     qs('#current-weather').innerHTML = `
       <div class="text-center">
+        <button id="copy-summary-btn" title="Zusammenfassung kopieren" class="float-right bg-white/20 hover:bg-white/30 rounded-lg px-2 py-1 text-xs">
+          <i class="fas fa-copy"></i>
+        </button>
         <i class="fas ${icon} text-5xl mb-2"></i>
         <p class="text-4xl font-bold">${Math.round(c.temperature_2m)}°C</p>
         <p class="text-lg mb-4">${label}</p>
@@ -183,7 +208,10 @@
           </div>
           <div>
             <p class="font-medium">Wind</p>
-            <p>${Math.round(c.wind_speed_10m)} km/h</p>
+            <p>
+              <i class="fas fa-location-arrow inline-block" style="transform: rotate(${Math.round(c.wind_direction_10m) - 45}deg)"></i>
+              ${Math.round(c.wind_speed_10m)} km/h
+            </p>
           </div>
           <div>
             <p class="font-medium">Feuchtigkeit</p>
@@ -194,8 +222,84 @@
             <p>${visibility != null ? Math.round(visibility / 1000) + ' km' : '–'}</p>
           </div>
         </div>
+        <div class="grid grid-cols-3 gap-3 text-sm mt-4 pt-4 border-t border-white/20">
+          <div>
+            <p class="font-medium"><i class="fas fa-sun mr-1"></i>Aufgang</p>
+            <p>${formatTime(d.sunrise[0])}</p>
+          </div>
+          <div>
+            <p class="font-medium"><i class="fas fa-moon mr-1"></i>Untergang</p>
+            <p>${formatTime(d.sunset[0])}</p>
+          </div>
+          <div>
+            <p class="font-medium">UV-Index</p>
+            <p>${Math.round(d.uv_index_max[0])}</p>
+          </div>
+        </div>
+        <canvas id="temp-sparkline" class="w-full mt-4" height="60"></canvas>
       </div>
     `;
+
+    qs('#copy-summary-btn').addEventListener('click', () => copySummary(data));
+    renderTempSparkline(data.hourly);
+  }
+
+  function renderTempSparkline(hourly) {
+    const canvas = qs('#temp-sparkline');
+    if (!canvas || !hourly || !hourly.temperature_2m) return;
+    const startIdx = currentHourlyIndex(hourly);
+    const temps = hourly.temperature_2m.slice(startIdx, startIdx + 24);
+    if (temps.length < 2) return;
+
+    const ctx = canvas.getContext('2d');
+    const width = (canvas.width = canvas.clientWidth);
+    const height = (canvas.height = 60);
+    const min = Math.min(...temps);
+    const max = Math.max(...temps);
+    const range = max - min || 1;
+    const stepX = width / (temps.length - 1);
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 2;
+    temps.forEach((t, i) => {
+      const x = i * stepX;
+      const y = height - 8 - ((t - min) / range) * (height - 16);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillText(`${Math.round(max)}°`, 2, 10);
+    ctx.fillText(`${Math.round(min)}°`, 2, height - 2);
+    ctx.fillText('24h-Trend', width - 60, 10);
+  }
+
+  function copySummary(weatherData) {
+    const btn = qs('#copy-summary-btn');
+    const c = weatherData.current;
+    const [, label] = weatherInfo(c.weather_code);
+    const risk = state.lastRisk;
+    const lines = [
+      `📍 ${state.cityName} – ${new Date().toLocaleString('de-DE')}`,
+      `🌡️ ${Math.round(c.temperature_2m)}°C, ${label}, Wind ${Math.round(c.wind_speed_10m)} km/h`,
+    ];
+    if (state.lastCongestionPct != null) {
+      lines.push(`🚦 Verkehrsauslastung: ${state.lastCongestionPct}%`);
+    }
+    if (risk) {
+      lines.push(`⚠️ Einsatzrisiko: ${risk.level} (${risk.score}/100)`);
+    }
+    lines.push('via LSS Verkehr & Wetter Dashboard');
+
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      if (!btn) return;
+      const original = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-check"></i>';
+      setTimeout(() => (btn.innerHTML = original), 1500);
+    });
   }
 
   function renderForecast(data) {
@@ -225,6 +329,129 @@
         `;
       })
       .join('');
+  }
+
+  // ---------- Luftqualität (Open-Meteo, ohne API-Key) ----------
+
+  async function fetchAirQuality(lat, lon) {
+    const url = new URL('https://air-quality-api.open-meteo.com/v1/air-quality');
+    url.searchParams.set('latitude', lat);
+    url.searchParams.set('longitude', lon);
+    url.searchParams.set('current', 'pm10,pm2_5,european_aqi');
+    url.searchParams.set('timezone', 'Europe/Berlin');
+
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error('Luftqualitäts-API antwortete mit ' + res.status);
+    return res.json();
+  }
+
+  function aqiLevel(aqi) {
+    return AQI_LEVELS.find((l) => aqi <= l.max) || AQI_LEVELS[AQI_LEVELS.length - 1];
+  }
+
+  function renderAirQuality(data) {
+    const c = data.current;
+    const aqi = Math.round(c.european_aqi);
+    const level = aqiLevel(aqi);
+    qs('#air-quality').innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <span class="inline-block ${level.color} text-white px-3 py-1 rounded-full text-sm">${level.label}</span>
+        <span class="text-2xl font-bold text-gray-800">${aqi}</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-sm text-gray-600">
+        <div><p class="font-medium text-gray-700">PM2.5</p><p>${Math.round(c.pm2_5)} µg/m³</p></div>
+        <div><p class="font-medium text-gray-700">PM10</p><p>${Math.round(c.pm10)} µg/m³</p></div>
+      </div>
+      <p class="text-xs text-gray-400 mt-3">Europäischer Luftqualitätsindex (EAQI)</p>
+    `;
+  }
+
+  function renderAirQualityError() {
+    qs('#air-quality').innerHTML = `<p class="text-gray-500 text-center py-6">Luftqualitätsdaten nicht verfügbar.</p>`;
+  }
+
+  // ---------- Einsatzrisiko-Index ----------
+
+  function computeRiskIndex({ weatherCode, tempNow, windSpeed, precipProbMax, congestionPct }) {
+    let score = 0;
+    const missions = [];
+
+    if ([95, 96, 99].includes(weatherCode)) {
+      score += 35;
+      missions.push('Blitzeinschlag / Gebäudebrand');
+    }
+    if (windSpeed >= 75) {
+      score += 35;
+      missions.push('Sturmschaden, Baum auf Fahrbahn/Gebäude');
+    } else if (windSpeed >= 50) {
+      score += 20;
+      missions.push('Sturmschaden (leicht)');
+    }
+    if ([65, 82].includes(weatherCode) || (precipProbMax >= 70 && [61, 63, 80, 81].includes(weatherCode))) {
+      score += 25;
+      missions.push('Land unter / Kanalreinigung / Wasserrettung');
+    }
+    if (tempNow <= 2 && [51, 53, 55, 61, 63, 66, 67, 71, 73, 75, 77, 85, 86].includes(weatherCode)) {
+      score += 30;
+      missions.push('Verkehrsunfälle durch Glätte');
+    }
+    if ([45, 48].includes(weatherCode)) {
+      score += 10;
+      missions.push('Sichtbehinderung / Auffahrunfälle');
+    }
+    if (congestionPct != null && congestionPct >= 60) {
+      score += 15;
+      missions.push('Erhöhtes Unfallrisiko im Stau');
+    }
+
+    score = Math.max(0, Math.min(100, score));
+
+    let level, color, barColor;
+    if (score < 25) { level = 'Niedrig'; color = 'text-green-700'; barColor = 'bg-green-500'; }
+    else if (score < 50) { level = 'Mittel'; color = 'text-yellow-700'; barColor = 'bg-yellow-500'; }
+    else if (score < 75) { level = 'Hoch'; color = 'text-orange-700'; barColor = 'bg-orange-500'; }
+    else { level = 'Sehr hoch'; color = 'text-red-700'; barColor = 'bg-red-600'; }
+
+    return { score, level, color, barColor, missions };
+  }
+
+  function renderRiskIndex(risk) {
+    const el = qs('#risk-index');
+    el.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <span class="font-semibold ${risk.color}">${risk.level}</span>
+        <span class="font-bold text-gray-800">${risk.score}/100</span>
+      </div>
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-3">
+        <div class="${risk.barColor} h-3 rounded-full transition-all duration-500" style="width: ${risk.score}%"></div>
+      </div>
+      ${
+        risk.missions.length
+          ? `<div class="flex flex-wrap gap-2">${risk.missions
+              .map((m) => `<span class="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full">${m}</span>`)
+              .join('')}</div>`
+          : '<p class="text-sm text-gray-500">Keine besonderen Einsatzrisiken durch Wetter/Verkehr erkennbar.</p>'
+      }
+      <p class="text-xs text-gray-400 mt-3">Heuristische Einschätzung für die Einsatzplanung im Leitstellenspiel – keine amtliche Wetterwarnung.</p>
+    `;
+  }
+
+  function updateRiskIndex() {
+    if (!state.lastWeather) {
+      qs('#risk-index').innerHTML = `<p class="text-gray-500 text-center py-4">Einschätzung ohne Wetterdaten nicht möglich.</p>`;
+      return;
+    }
+    const c = state.lastWeather.current;
+    const d = state.lastWeather.daily;
+    const risk = computeRiskIndex({
+      weatherCode: c.weather_code,
+      tempNow: c.temperature_2m,
+      windSpeed: c.wind_speed_10m,
+      precipProbMax: d.precipitation_probability_max[0],
+      congestionPct: state.lastCongestionPct,
+    });
+    state.lastRisk = risk;
+    renderRiskIndex(risk);
   }
 
   // ---------- Traffic (TomTom) ----------
@@ -261,6 +488,7 @@
 
   function renderTraffic(flow) {
     const { pct, label, colorClass } = congestionLevel(flow.currentSpeed, flow.freeFlowSpeed);
+    state.lastCongestionPct = pct;
     qs('#current-traffic').innerHTML = `
       <div class="text-center">
         <div class="inline-block ${colorClass} text-white px-3 py-1 rounded-full text-sm mb-4">
@@ -274,6 +502,7 @@
   }
 
   function renderTrafficDemo() {
+    state.lastCongestionPct = null;
     const pct = 20 + Math.round(Math.random() * 40);
     const speed = Math.round(90 - pct * 0.6);
     const { label, colorClass } = congestionLevel(90 - pct * 0.6, 90);
@@ -384,7 +613,7 @@
     return `
       <div>
         <h3 class="font-medium text-gray-700 mb-2">${label}${demo ? ' <span class="text-xs text-gray-400">(Demo)</span>' : ''}</h3>
-        <div class="w-full bg-gray-200 rounded-full h-2.5">
+        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
           <div class="${barColor} h-2.5 rounded-full transition-all duration-500" style="width: ${pct}%"></div>
         </div>
         <p class="text-sm text-gray-500 mt-1">${detail} · ${pct}% Auslastung</p>
@@ -451,10 +680,20 @@
 
     try {
       const weather = await fetchWeather(state.lat, state.lon);
+      state.lastWeather = weather;
       renderWeather(weather);
       renderForecast(weather);
     } catch (err) {
+      state.lastWeather = null;
       qs('#current-weather').innerHTML = `<p class="text-center py-6">Wetterdaten konnten nicht geladen werden.</p>`;
+      console.error(err);
+    }
+
+    try {
+      const airQuality = await fetchAirQuality(state.lat, state.lon);
+      renderAirQuality(airQuality);
+    } catch (err) {
+      renderAirQualityError();
       console.error(err);
     }
 
@@ -479,6 +718,7 @@
       renderAlertsDemo();
     }
 
+    updateRiskIndex();
     renderRoadConditions(state.lat, state.lon);
     updateDemoBanner();
     setLastUpdated();
@@ -507,6 +747,56 @@
     refreshAll();
   }
 
+  // ---------- Dark Mode ----------
+
+  function initTheme() {
+    const saved = localStorage.getItem(STORAGE_KEYS.theme);
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const dark = saved ? saved === 'dark' : prefersDark;
+    document.documentElement.classList.toggle('dark', dark);
+    updateThemeIcon(dark);
+  }
+
+  function toggleTheme() {
+    const dark = !document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', dark);
+    localStorage.setItem(STORAGE_KEYS.theme, dark ? 'dark' : 'light');
+    updateThemeIcon(dark);
+  }
+
+  function updateThemeIcon(dark) {
+    const btn = qs('#theme-toggle-btn');
+    if (btn) btn.innerHTML = dark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+  }
+
+  // ---------- Geolocation ----------
+
+  function useMyLocation() {
+    const status = qs('#geo-status');
+    if (!navigator.geolocation) {
+      if (status) status.textContent = 'Geolocation wird von diesem Browser nicht unterstützt.';
+      return;
+    }
+    if (status) status.textContent = 'Standort wird ermittelt...';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const name = 'Mein Standort';
+        CITIES[name] = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        state.cityName = name;
+        state.lat = pos.coords.latitude;
+        state.lon = pos.coords.longitude;
+        localStorage.setItem(STORAGE_KEYS.city, name);
+        populateCitySelect();
+        if (status) status.textContent = '';
+        refreshAll();
+      },
+      (err) => {
+        if (status) status.textContent = 'Standort konnte nicht ermittelt werden (' + err.message + ').';
+      },
+      { timeout: 8000 }
+    );
+  }
+
   // ---------- Events ----------
 
   function onCityChange(e) {
@@ -524,6 +814,7 @@
     loadState();
     populateCitySelect();
     updateDemoBanner();
+    initTheme();
 
     qs('#city-select').addEventListener('change', onCityChange);
     qs('#refresh-btn').addEventListener('click', refreshAll);
@@ -531,6 +822,8 @@
     qs('#settings-close-btn').addEventListener('click', closeSettings);
     qs('#settings-save-btn').addEventListener('click', saveSettings);
     qs('#demo-banner-settings-link').addEventListener('click', openSettings);
+    qs('#theme-toggle-btn').addEventListener('click', toggleTheme);
+    qs('#geo-btn').addEventListener('click', useMyLocation);
 
     refreshAll();
     state.refreshTimer = setInterval(refreshAll, 10 * 60 * 1000);
