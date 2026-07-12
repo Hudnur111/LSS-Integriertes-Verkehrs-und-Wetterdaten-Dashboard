@@ -20,15 +20,12 @@
                 <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">LSS Verkehr &amp; Wetter Live</h1>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-                <select id="city-select" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-100"></select>
-                <button id="geo-btn" title="Meinen Standort verwenden" class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 px-3 py-2 rounded-lg transition-colors">
+                <select id="city-select" title="Ort wählen" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-3 py-2 text-sm text-gray-700 dark:text-gray-100"></select>
+                <button id="geo-btn" title="Standort jetzt neu ermitteln" class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 px-3 py-2 rounded-lg transition-colors">
                     <i class="fas fa-location-crosshairs"></i>
                 </button>
                 <button id="theme-toggle-btn" title="Dunkel-/Hellmodus" class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 px-3 py-2 rounded-lg transition-colors">
                     <i class="fas fa-moon"></i>
-                </button>
-                <button id="settings-btn" title="Verkehrs-API-Key einrichten" class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-100 px-3 py-2 rounded-lg flex items-center space-x-2 transition-colors">
-                    <i class="fas fa-gear"></i>
                 </button>
                 <button id="refresh-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors">
                     <i class="fas fa-sync-alt"></i>
@@ -39,8 +36,7 @@
         <p id="geo-status" class="text-xs text-gray-400 px-4 pb-2"></p>
         <div id="demo-banner" class="hidden bg-amber-50 dark:bg-amber-900/40 border-t border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm px-4 py-2 text-center">
             <i class="fas fa-triangle-exclamation mr-1"></i>
-            Verkehrsdaten laufen im Demo-Modus.
-            <button id="demo-banner-settings-link" class="underline font-medium">Kostenlosen TomTom-API-Key hinterlegen</button>, um echte Verkehrsdaten zu sehen.
+            Live-Verkehrsdaten aktuell nicht erreichbar – es werden Demo-Daten angezeigt.
         </div>
     </header>
 
@@ -135,24 +131,6 @@
         </div>
     </main>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-20 px-4">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-md">
-            <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">Verkehrsdaten-Einstellungen</h2>
-            <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                Für echte Live-Verkehrsdaten wird ein kostenloser API-Key von
-                <span class="font-medium">TomTom Traffic API</span> benötigt (developer.tomtom.com).
-                Ohne Key werden Demo-Daten angezeigt.
-            </p>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">TomTom API-Key</label>
-            <input id="tomtom-key-input" type="text" placeholder="Dein API-Key" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg px-3 py-2 mb-4 text-sm">
-            <div class="flex justify-end gap-2">
-                <button id="settings-close-btn" class="px-4 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Abbrechen</button>
-                <button id="settings-save-btn" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white">Speichern</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-8 mt-12">
         <div class="container mx-auto px-4">
@@ -173,7 +151,7 @@
                     <h3 class="text-lg font-semibold mb-4">Datenquellen</h3>
                     <ul class="space-y-2 text-gray-300">
                         <li><i class="fas fa-cloud mr-2"></i> Open-Meteo (Wetter &amp; Luftqualität)</li>
-                        <li><i class="fas fa-road mr-2"></i> TomTom Traffic API (Verkehr)</li>
+                        <li><i class="fas fa-road mr-2"></i> TomTom Traffic API (via eigenem Proxy)</li>
                         <li><i class="fas fa-map mr-2"></i> OpenStreetMap (Karte)</li>
                     </ul>
                 </div>

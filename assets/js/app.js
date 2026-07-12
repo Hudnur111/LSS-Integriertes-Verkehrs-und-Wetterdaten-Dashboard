@@ -1,16 +1,22 @@
 /**
  * LSS Verkehrs- & Wetterdaten-Dashboard
- * Wetter: Open-Meteo (kostenlos, ohne API-Key)
- * Verkehr: TomTom Traffic API (optionaler, kostenloser API-Key nötig)
+ * Wetter & Luftqualität: Open-Meteo (kostenlos, ohne API-Key)
+ * Verkehr: über einen serverseitigen Proxy (siehe worker/traffic-proxy.js),
+ * damit niemand einen eigenen TomTom-API-Key benötigt.
  */
 (function () {
   'use strict';
 
+  // Passe dies an, wenn du deinen eigenen Traffic-Proxy deployst (siehe worker/README.md).
+  const TRAFFIC_PROXY_URL = 'https://lss-traffic-proxy.hudnur111.workers.dev';
+
   const STORAGE_KEYS = {
     city: 'lss_dashboard_city',
-    tomtomKey: 'lss_dashboard_tomtom_key',
     theme: 'lss_dashboard_theme',
   };
+
+  const AUTO_LOCATION_KEY = '__auto__';
+  const AUTO_LOCATION_LABEL = '📍 Automatischer Standort';
 
   const AQI_LEVELS = [
     { max: 20, label: 'Gut', color: 'bg-green-500' },
@@ -74,13 +80,14 @@
     cityName: 'Berlin',
     lat: 52.5200,
     lon: 13.4050,
-    tomtomKey: '',
+    locationMode: 'auto',
     map: null,
     mapMarker: null,
     incidentMarkers: [],
     refreshTimer: null,
     lastWeather: null,
     lastCongestionPct: null,
+    trafficLive: false,
   };
 
   function weatherInfo(code) {
@@ -107,36 +114,45 @@
       state.cityName = paramCity;
       state.lat = paramLat;
       state.lon = paramLon;
+      state.locationMode = 'manual';
       if (!CITIES[paramCity]) {
         CITIES[paramCity] = { lat: paramLat, lon: paramLon };
       }
-    } else {
-      const savedCity = localStorage.getItem(STORAGE_KEYS.city);
-      if (savedCity && CITIES[savedCity]) {
-        state.cityName = savedCity;
-        state.lat = CITIES[savedCity].lat;
-        state.lon = CITIES[savedCity].lon;
-      }
+      return;
     }
 
-    state.tomtomKey = localStorage.getItem(STORAGE_KEYS.tomtomKey) || '';
+    const savedCity = localStorage.getItem(STORAGE_KEYS.city);
+    if (savedCity && savedCity !== AUTO_LOCATION_KEY && CITIES[savedCity]) {
+      state.cityName = savedCity;
+      state.lat = CITIES[savedCity].lat;
+      state.lon = CITIES[savedCity].lon;
+      state.locationMode = 'manual';
+    } else {
+      // Standard beim ersten Besuch bzw. wenn "Automatisch" gespeichert ist:
+      // Standort direkt automatisch ermitteln.
+      state.locationMode = 'auto';
+    }
   }
 
   function populateCitySelect() {
     const select = qs('#city-select');
     select.innerHTML = '';
+    const autoOpt = document.createElement('option');
+    autoOpt.value = AUTO_LOCATION_KEY;
+    autoOpt.textContent = AUTO_LOCATION_LABEL;
+    select.appendChild(autoOpt);
     Object.keys(CITIES).forEach((name) => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
-      if (name === state.cityName) opt.selected = true;
       select.appendChild(opt);
     });
+    select.value = state.locationMode === 'auto' ? AUTO_LOCATION_KEY : state.cityName;
   }
 
-  function updateDemoBanner() {
+  function updateDemoBanner(isLive) {
     const banner = qs('#demo-banner');
-    banner.classList.toggle('hidden', !!state.tomtomKey);
+    banner.classList.toggle('hidden', !!isLive);
   }
 
   function setLastUpdated() {
@@ -454,24 +470,17 @@
     renderRiskIndex(risk);
   }
 
-  // ---------- Traffic (TomTom) ----------
+  // ---------- Traffic (über eigenen Proxy, kein API-Key nötig) ----------
 
   async function fetchFlow(lat, lon) {
-    const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${lat},${lon}&key=${encodeURIComponent(state.tomtomKey)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Verkehrs-API antwortete mit ' + res.status);
-    const json = await res.json();
-    return json.flowSegmentData;
+    const res = await fetch(`${TRAFFIC_PROXY_URL}/flow?lat=${lat}&lon=${lon}`);
+    if (!res.ok) throw new Error('Verkehrs-Proxy antwortete mit ' + res.status);
+    return res.json();
   }
 
   async function fetchIncidents(lat, lon) {
-    const d = 0.15;
-    const bbox = [lon - d, lat - d, lon + d, lat + d].join(',');
-    const fields =
-      '{incidents{type,geometry{type,coordinates},properties{iconCategory,magnitudeOfDelay,events{description},roadNumbers,delay}}}';
-    const url = `https://api.tomtom.com/traffic/services/5/incidentDetails?bbox=${bbox}&language=de-DE&fields=${encodeURIComponent(fields)}&key=${encodeURIComponent(state.tomtomKey)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Meldungs-API antwortete mit ' + res.status);
+    const res = await fetch(`${TRAFFIC_PROXY_URL}/incidents?lat=${lat}&lon=${lon}&radius=0.15`);
+    if (!res.ok) throw new Error('Meldungs-Proxy antwortete mit ' + res.status);
     const json = await res.json();
     return json.incidents || [];
   }
@@ -514,7 +523,7 @@
         </div>
         <p class="text-lg mb-2">Durchschnittliche Geschwindigkeit</p>
         <p class="text-4xl font-bold">${speed} km/h</p>
-        <p class="text-sm mt-2 opacity-80">API-Key hinterlegen für echte Verkehrsdaten</p>
+        <p class="text-sm mt-2 opacity-80">Live-Verkehrsdaten aktuell nicht erreichbar</p>
       </div>
     `;
   }
@@ -537,14 +546,12 @@
     el.innerHTML = `<div class="space-y-3">${incidents
       .slice(0, 6)
       .map((inc) => {
-        const props = inc.properties || {};
-        const desc = props.events && props.events[0] ? props.events[0].description : 'Verkehrsmeldung';
-        const road = (props.roadNumbers || []).join(', ') || 'Unbekannte Straße';
-        const cls = severityColor(props.magnitudeOfDelay);
+        const road = (inc.roadNumbers || []).join(', ') || 'Unbekannte Straße';
+        const cls = severityColor(inc.magnitudeOfDelay);
         return `
           <div class="p-3 border-l-4 ${cls} rounded">
             <p class="font-medium">${road}</p>
-            <p class="text-sm text-gray-600">${desc}</p>
+            <p class="text-sm text-gray-600">${inc.description}</p>
           </div>
         `;
       })
@@ -576,16 +583,6 @@
     ];
     const el = qs('#road-conditions');
 
-    if (!state.tomtomKey) {
-      el.innerHTML = points
-        .map((p) => {
-          const pct = 10 + Math.round(Math.random() * 60);
-          return roadBarHtml(p.label, pct, true);
-        })
-        .join('');
-      return;
-    }
-
     try {
       const results = await Promise.all(points.map((p) => fetchFlow(p.lat, p.lon)));
       el.innerHTML = points
@@ -596,7 +593,12 @@
         })
         .join('');
     } catch (err) {
-      el.innerHTML = `<p class="text-gray-500 text-center py-4">Messpunkte konnten nicht geladen werden.</p>`;
+      el.innerHTML = points
+        .map((p) => {
+          const pct = 10 + Math.round(Math.random() * 60);
+          return roadBarHtml(p.label, pct, true);
+        })
+        .join('');
     }
   }
 
@@ -641,23 +643,32 @@
     state.mapMarker = L.marker([state.lat, state.lon]).addTo(state.map).bindPopup(state.cityName);
   }
 
+  function incidentIcon(magnitudeOfDelay) {
+    let bg = '#f59e0b';
+    if (magnitudeOfDelay >= 3) bg = '#dc2626';
+    else if (magnitudeOfDelay >= 2) bg = '#f97316';
+    return L.divIcon({
+      className: 'lss-incident-icon',
+      html: `<div style="background:${bg};width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid #fff;">
+               <span style="transform:rotate(45deg);color:#fff;font-weight:800;font-size:14px;">!</span>
+             </div>`,
+      iconSize: [26, 26],
+      iconAnchor: [13, 26],
+      popupAnchor: [0, -26],
+    });
+  }
+
   function updateMapIncidents(incidents) {
     if (!state.map) return;
     state.incidentMarkers.forEach((m) => state.map.removeLayer(m));
     state.incidentMarkers = [];
     incidents.forEach((inc) => {
-      const coords = inc.geometry && inc.geometry.coordinates;
-      if (!coords) return;
-      const point = inc.geometry.type === 'LineString' ? coords[0] : coords;
-      if (!Array.isArray(point) || point.length < 2) return;
-      const props = inc.properties || {};
-      const desc = props.events && props.events[0] ? props.events[0].description : 'Verkehrsmeldung';
-      const marker = L.circleMarker([point[1], point[0]], {
-        radius: 7,
-        color: '#dc2626',
-        fillColor: '#ef4444',
-        fillOpacity: 0.8,
-      }).addTo(state.map).bindPopup(desc);
+      if (inc.lat == null || inc.lon == null) return;
+      const road = (inc.roadNumbers || []).join(', ');
+      const popupText = road ? `${road}: ${inc.description}` : inc.description;
+      const marker = L.marker([inc.lat, inc.lon], { icon: incidentIcon(inc.magnitudeOfDelay) })
+        .addTo(state.map)
+        .bindPopup(popupText);
       state.incidentMarkers.push(marker);
     });
   }
@@ -697,54 +708,29 @@
       console.error(err);
     }
 
-    if (state.tomtomKey) {
-      try {
-        const flow = await fetchFlow(state.lat, state.lon);
-        renderTraffic(flow);
-      } catch (err) {
-        renderTrafficDemo();
-        console.error(err);
-      }
-      try {
-        const incidents = await fetchIncidents(state.lat, state.lon);
-        renderAlerts(incidents);
-        updateMapIncidents(incidents);
-      } catch (err) {
-        renderAlertsDemo();
-        console.error(err);
-      }
-    } else {
+    let trafficOk = false;
+    try {
+      const flow = await fetchFlow(state.lat, state.lon);
+      renderTraffic(flow);
+      trafficOk = true;
+    } catch (err) {
       renderTrafficDemo();
-      renderAlertsDemo();
+      console.error(err);
     }
+    try {
+      const incidents = await fetchIncidents(state.lat, state.lon);
+      renderAlerts(incidents);
+      updateMapIncidents(incidents);
+    } catch (err) {
+      renderAlertsDemo();
+      console.error(err);
+    }
+    state.trafficLive = trafficOk;
 
     updateRiskIndex();
     renderRoadConditions(state.lat, state.lon);
-    updateDemoBanner();
+    updateDemoBanner(state.trafficLive);
     setLastUpdated();
-  }
-
-  // ---------- Settings modal ----------
-
-  function openSettings() {
-    qs('#settings-modal').classList.remove('hidden');
-    qs('#tomtom-key-input').value = state.tomtomKey;
-  }
-
-  function closeSettings() {
-    qs('#settings-modal').classList.add('hidden');
-  }
-
-  function saveSettings() {
-    const key = qs('#tomtom-key-input').value.trim();
-    state.tomtomKey = key;
-    if (key) {
-      localStorage.setItem(STORAGE_KEYS.tomtomKey, key);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.tomtomKey);
-    }
-    closeSettings();
-    refreshAll();
   }
 
   // ---------- Dark Mode ----------
@@ -769,63 +755,74 @@
     if (btn) btn.innerHTML = dark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
   }
 
-  // ---------- Geolocation ----------
+  // ---------- Geolocation (automatischer Standort) ----------
 
-  function useMyLocation() {
+  function detectLocation() {
     const status = qs('#geo-status');
     if (!navigator.geolocation) {
-      if (status) status.textContent = 'Geolocation wird von diesem Browser nicht unterstützt.';
+      if (status) status.textContent = 'Automatische Standorterkennung nicht unterstützt – zeige ' + state.cityName + '.';
+      refreshAll();
       return;
     }
-    if (status) status.textContent = 'Standort wird ermittelt...';
+    if (status) status.textContent = 'Standort wird automatisch ermittelt...';
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const name = 'Mein Standort';
-        CITIES[name] = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        state.cityName = name;
+        state.cityName = 'Mein Standort';
         state.lat = pos.coords.latitude;
         state.lon = pos.coords.longitude;
-        localStorage.setItem(STORAGE_KEYS.city, name);
-        populateCitySelect();
         if (status) status.textContent = '';
         refreshAll();
       },
       (err) => {
-        if (status) status.textContent = 'Standort konnte nicht ermittelt werden (' + err.message + ').';
+        if (status) status.textContent = 'Standort nicht verfügbar (' + err.message + ') – zeige ' + state.cityName + '.';
+        refreshAll();
       },
       { timeout: 8000 }
     );
   }
 
+  function onGeoButtonClick() {
+    state.locationMode = 'auto';
+    localStorage.setItem(STORAGE_KEYS.city, AUTO_LOCATION_KEY);
+    populateCitySelect();
+    detectLocation();
+  }
+
   // ---------- Events ----------
 
   function onCityChange(e) {
-    const name = e.target.value;
-    const city = CITIES[name];
+    const value = e.target.value;
+    if (value === AUTO_LOCATION_KEY) {
+      state.locationMode = 'auto';
+      localStorage.setItem(STORAGE_KEYS.city, AUTO_LOCATION_KEY);
+      detectLocation();
+      return;
+    }
+    const city = CITIES[value];
     if (!city) return;
-    state.cityName = name;
+    state.locationMode = 'manual';
+    state.cityName = value;
     state.lat = city.lat;
     state.lon = city.lon;
-    localStorage.setItem(STORAGE_KEYS.city, name);
+    localStorage.setItem(STORAGE_KEYS.city, value);
     refreshAll();
   }
 
   function init() {
     loadState();
     populateCitySelect();
-    updateDemoBanner();
     initTheme();
 
     qs('#city-select').addEventListener('change', onCityChange);
     qs('#refresh-btn').addEventListener('click', refreshAll);
-    qs('#settings-btn').addEventListener('click', openSettings);
-    qs('#settings-close-btn').addEventListener('click', closeSettings);
-    qs('#settings-save-btn').addEventListener('click', saveSettings);
-    qs('#demo-banner-settings-link').addEventListener('click', openSettings);
     qs('#theme-toggle-btn').addEventListener('click', toggleTheme);
-    qs('#geo-btn').addEventListener('click', useMyLocation);
+    qs('#geo-btn').addEventListener('click', onGeoButtonClick);
 
-    refreshAll();
+    if (state.locationMode === 'auto') {
+      detectLocation();
+    } else {
+      refreshAll();
+    }
     state.refreshTimer = setInterval(refreshAll, 10 * 60 * 1000);
   }
 
