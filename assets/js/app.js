@@ -395,8 +395,14 @@
   // ---------- Map ----------
 
   function initMap() {
+    if (typeof L === 'undefined') {
+      const el = qs('#traffic-map-leaflet');
+      if (el) el.innerHTML = '<p class="text-gray-500 text-center py-16 px-4">Karte konnte nicht geladen werden (Leaflet nicht verfügbar).</p>';
+      return;
+    }
     if (state.map) {
       state.map.remove();
+      state.map = null;
     }
     state.map = L.map('traffic-map-leaflet').setView([state.lat, state.lon], 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -407,6 +413,7 @@
   }
 
   function updateMapIncidents(incidents) {
+    if (!state.map) return;
     state.incidentMarkers.forEach((m) => state.map.removeLayer(m));
     state.incidentMarkers = [];
     incidents.forEach((inc) => {
@@ -431,11 +438,15 @@
   async function refreshAll() {
     document.querySelectorAll('.loading-spinner').forEach((s) => (s.style.display = 'block'));
 
-    if (state.map) {
-      state.map.setView([state.lat, state.lon], 11);
-      state.mapMarker.setLatLng([state.lat, state.lon]).bindPopup(state.cityName);
-    } else {
-      initMap();
+    try {
+      if (state.map) {
+        state.map.setView([state.lat, state.lon], 11);
+        state.mapMarker.setLatLng([state.lat, state.lon]).bindPopup(state.cityName);
+      } else {
+        initMap();
+      }
+    } catch (err) {
+      console.error('Kartenfehler:', err);
     }
 
     try {
