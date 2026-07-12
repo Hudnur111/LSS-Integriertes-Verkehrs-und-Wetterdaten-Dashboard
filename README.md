@@ -1,33 +1,74 @@
-# 🚨 Verkehrs- und Wetterdaten-Dashboard für das Leitstellenspiel
+# 🚨 LSS Verkehrs- & Wetterdaten-Mod
 
-Das **Verkehrs- und Wetterdaten-Dashboard** bietet eine zentrale Übersicht, die **Echtzeitinformationen zu Verkehrslage und Wetterbedingungen** integriert. Ziel ist es, die **Einsatzplanung und Koordination** im [Leitstellenspiel](https://www.leitstellenspiel.de/) effizienter und **realitätsnäher** zu gestalten.
+Ein Fan-Mod für das [Leitstellenspiel](https://www.leitstellenspiel.de/), der **echte Echtzeit-Wetter- und Verkehrsdaten** direkt ins Spiel bringt: ein kompaktes Popup mit Kurzinfos während des Spielens, und ein vollständiges Detail-Dashboard einen Klick entfernt.
 
-📊 Die dargestellten Daten stammen aus dem **vergangenen Jahr** und ermöglichen eine fundierte Analyse vergangener Einsatzbedingungen sowie eine strategischere Planung zukünftiger Lagen.
+## 🧩 Wie der Mod funktioniert
+
+1. **Popup im Spiel** – Ein kleiner Button (⛅) schwebt unten rechts über der Leitstellenspiel-Seite. Ein Klick öffnet ein kompaktes Popup mit aktueller Temperatur, Wetterlage und (optional) Verkehrsauslastung für eine wählbare Stadt.
+2. **Detail-Dashboard** – Der Button *„Vollständiges Dashboard öffnen“* im Popup öffnet in einem neuen Tab `index.html` mit vollständigen Details: 5-Tage-Wettervorhersage, Live-Verkehrskarte, Verkehrsmeldungen und Messpunkten rund um die Stadt.
+
+Beide Teile nutzen **echte APIs**, keine simulierten Zufallsdaten:
+
+| Datenart | Quelle | API-Key nötig? |
+|---|---|---|
+| 🌦️ Wetter (aktuell + Vorhersage) | [Open-Meteo](https://open-meteo.com/) | Nein |
+| 🚗 Verkehrsfluss & Meldungen | [TomTom Traffic API](https://developer.tomtom.com/) | Ja (kostenloses Kontingent) |
+| 🗺️ Karte | [OpenStreetMap](https://www.openstreetmap.org/) via Leaflet | Nein |
+
+Ist kein TomTom-Key hinterlegt, läuft der Verkehrsteil in einem klar gekennzeichneten **Demo-Modus** weiter – die App bleibt voll funktionsfähig.
+
+## 🚀 Installation
+
+### 1. Detail-Dashboard hosten
+- Am einfachsten über **GitHub Pages**: Repository → *Settings → Pages* → Branch `main`, Root-Verzeichnis. Die Seite ist danach unter `https://<dein-user>.github.io/<repo>/index.html` erreichbar.
+- Alternativ lokal öffnen oder auf einem eigenen Webserver hosten.
+
+### 2. Userscript installieren
+1. Browser-Erweiterung [Tampermonkey](https://www.tampermonkey.net/) installieren.
+2. Datei [`mod/lss-verkehr-wetter-mod.user.js`](mod/lss-verkehr-wetter-mod.user.js) öffnen und über Tampermonkey installieren (bzw. Inhalt in ein neues Userscript einfügen).
+3. Falls das Dashboard nicht über die Standard-GitHub-Pages-URL erreichbar ist, die Konstante `DASHBOARD_URL` am Anfang des Scripts anpassen.
+4. Leitstellenspiel öffnen – der ⛅-Button erscheint unten rechts.
+
+### 3. Echte Verkehrsdaten aktivieren (optional)
+1. Kostenlosen Account auf [developer.tomtom.com](https://developer.tomtom.com/) anlegen und einen API-Key erzeugen (Free-Tier reicht für den privaten Gebrauch).
+2. Im Popup auf *„Verkehrs-API-Key einrichten“* klicken und den Key eintragen, **oder** im Detail-Dashboard über das ⚙️-Icon.
+3. Der Key wird lokal gespeichert (Tampermonkey-Storage bzw. `localStorage`) und nie an Dritte übermittelt.
 
 ## 🔧 Features
 
-- ✅ Übersichtliche Visualisierung historischer **Verkehrsdaten**
-- 🌦️ Integration vergangener **Wetterbedingungen**
-- 🚓 Unterstützung für **realitätsnahe Simulationen**
-- 📅 Verbesserte **Einsatzplanung** durch historische Datenanalyse
+- 📍 Auswahl aus 14 großen deutschen Städten (Berlin, Hamburg, München, Köln, ...)
+- 🌦️ Echtzeit-Wetter inkl. gefühlter Temperatur, Wind, Luftfeuchtigkeit, Sichtweite
+- 📅 5-Tage-Wettervorhersage mit Regenwahrscheinlichkeit
+- 🚦 Live-Verkehrsauslastung (Geschwindigkeit vs. freie Fließgeschwindigkeit)
+- 📣 Echte Verkehrsmeldungen (Unfälle, Baustellen, Sperrungen) auf Karte & Liste
+- 🗺️ Interaktive Karte mit Live-Marker für gemeldete Vorfälle
+- 🔁 Auto-Refresh alle 10 Minuten (Dashboard) bzw. 5 Minuten (Popup)
+- 🧭 Deep-Link: Popup übergibt Stadt/Koordinaten per URL an das Dashboard
 
 ## 🛠️ Verwendete Technologien
 
-- **Python** – für Datenanalyse und Backend-Logik  
-- **JavaScript** – zur interaktiven Darstellung im Frontend  
-- **HTML & CSS** – für die strukturierte und ansprechende Web-Oberfläche  
-- **JSON/CSV** – zur Verarbeitung und Speicherung der Datensätze
+- **Vanilla JavaScript** (kein Build-Schritt nötig)
+- **Tailwind CSS** & **Font Awesome** für die Oberfläche
+- **Leaflet.js** + OpenStreetMap für die Karte
+- **Tampermonkey Userscript API** (`GM_xmlhttpRequest`, `GM_setValue`) für das In-Game-Popup
 
-## 📁 Datenbasis
+## 📁 Projektstruktur
 
-Die Daten basieren auf simulierten Verkehrs- und Wetterdaten des vergangenen Jahres und dienen der Erweiterung des Realismus im Spiel.
+```
+index.html                          # Detail-Dashboard
+assets/css/style.css                # Styles
+assets/js/app.js                    # Dashboard-Logik (Fetch, Rendering, Karte)
+mod/lss-verkehr-wetter-mod.user.js  # Tampermonkey-Mod fürs Spiel (Popup)
+```
 
 ## 📌 Zielgruppe
 
-Dieses Projekt richtet sich an:
-- Spieler:innen des **Leitstellenspiels**
-- Entwickler:innen, die Interesse an Echtzeit-Dashboards haben
-- Personen, die Simulationen mit realitätsnaher Datenbasis verbessern möchten
+- Spieler:innen des **Leitstellenspiels**, die reale Wetter-/Verkehrslage in ihre Einsatzplanung einbeziehen möchten
+- Entwickler:innen, die an Echtzeit-Dashboards oder Userscript-Mods interessiert sind
+
+## ⚠️ Hinweis
+
+Dies ist ein inoffizielles Fan-Projekt ohne Verbindung zum Leitstellenspiel-Team. Die Nutzung von Drittanbieter-APIs unterliegt deren jeweiligen Nutzungsbedingungen (siehe [Open-Meteo](https://open-meteo.com/en/terms), [TomTom](https://developer.tomtom.com/terms-and-conditions), [OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/)).
 
 ---
 

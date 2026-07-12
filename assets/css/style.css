@@ -1,0 +1,23 @@
+.weather-card {
+    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+.traffic-card {
+    background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+}
+.forecast-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+.loading-spinner {
+    border-top-color: #3b82f6;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+#traffic-map-leaflet {
+    height: 16rem;
+    width: 100%;
+    z-index: 0;
+}
