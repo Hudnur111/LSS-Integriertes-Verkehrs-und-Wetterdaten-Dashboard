@@ -75,13 +75,30 @@ Details und Endpunkt-Beschreibung: [`worker/traffic-proxy.js`](worker/traffic-pr
 ## 📁 Projektstruktur
 
 ```
-index.html                          # Detail-Dashboard
+index.html                          # Detail-Dashboard (Wetter/Luft/Verkehr)
+game-dashboard.html                 # Live-Einsatzkarte (Spieldaten-Modul)
 assets/css/style.css                # Styles
 assets/js/app.js                    # Dashboard-Logik (Fetch, Rendering, Karte)
+assets/js/game/                     # Einsatzkarte: Event-Bus, Cache, Adapter, Karten-Layer, Isochronen, Ticker, Blackbox
 mod/lss-verkehr-wetter-mod.user.js  # Tampermonkey-Mod fürs Spiel (Popup + Mini-Karte)
 worker/traffic-proxy.js             # Cloudflare-Worker-Proxy für TomTom-Verkehrsdaten
 worker/wrangler.toml                # Deployment-Konfiguration für den Worker
 ```
+
+## 🎮 Live-Einsatzkarte (`game-dashboard.html`)
+
+Ein separates Karten-Modul, das In-Game-Einsätze (Feuerwehr, Rettungsdienst, Polizei, THW, Wasserrettung, ...) visuell auf einer Leaflet-Karte darstellt — inklusive Clustering, Heatmap, Regenradar (RainViewer, kostenlos), Ausrück-Radien beim Klick auf eine Wache, URL-Deep-Linking und einem BOS-Ticker.
+
+**Wichtiger Stand der Technik:** Leitstellenspiel bietet keine öffentliche Echtzeit-API/WebSocket für Einsätze oder Fahrzeuge. Die Datenquelle ist daher als austauschbares **Adapter-Interface** (`assets/js/game/game-adapter.js`) gebaut:
+
+- **`MockGameAdapter`** (aktiv) — erzeugt realistische synthetische Einsätze aus der mitgelieferten Einsatzliste (`assets/js/game/missions-data.js`), inklusive echter Namen, Credits und Ressourcen-Voraussetzungen. Damit ist die komplette Karte, Clustering, Heatmap, Isochronen-Logik und das Replay-System schon heute voll funktionsfähig und demonstrierbar.
+- **`LssDomAdapter`** (Platzhalter) — soll später echte Einsätze/Fahrzeuge direkt aus dem DOM der Spielseiten auslesen (das ist der einzig realistische Weg, da es keine offizielle API gibt). Dafür fehlen aktuell die echten CSS-Selektoren/HTML-Struktur der Live-Seiten — die TODOs stehen direkt im Code. Um diesen Adapter fertigzustellen, entweder reale HTML-Ausschnitte der Einsatzliste/Fahrzeugübersicht bereitstellen, oder eine Session mit Zugriff auf leitstellenspiel.de nutzen.
+
+Alle anderen Module (Karten-Rendering, Ticker, Blackbox-Replay, Isochronen) kennen nur den zentralen `EventBus` und funktionieren unverändert, sobald ein echter Adapter die gleichen Events emittiert wie der Mock.
+
+**Weitere Hinweise zur Ehrlichkeit der Umsetzung:**
+- Die **Ausrück-Radien** sind Näherungen (konzentrische Ringe basierend auf einer angenommenen Durchschnittsgeschwindigkeit, abzüglich eines Abschlags für nahe Einsätze), keine echte straßennetzbasierte Routingberechnung — dafür wäre ein Routing-Anbieter mit API-Key nötig (analog zum Verkehrs-Proxy umsetzbar, aber nicht enthalten).
+- Der **Hybrid-Cache** (`assets/js/game/cache.js`) dedupliziert gleichzeitige Anfragen und hält Ergebnisse 15–30 Minuten in `sessionStorage` + In-Memory vor, inkl. Invalidierung bei Standortwechsel &gt; 5 km.
 
 ## 📌 Zielgruppe
 

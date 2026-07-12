@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSS Live-Einsatzkarte</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' };</script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+      #game-map { height: 100%; width: 100%; }
+      #ticker-bar { white-space: nowrap; overflow: hidden; }
+      #ticker-track { display: inline-block; padding-left: 100%; animation: ticker-scroll 40s linear infinite; }
+      @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+      .sidebar-scroll { max-height: calc(100vh - 220px); overflow-y: auto; }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 dark:text-gray-100 font-sans h-screen flex flex-col">
+    <header class="bg-white dark:bg-gray-800 shadow-sm z-20">
+        <div class="container mx-auto px-4 py-3 flex flex-wrap gap-3 justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-map-location-dot text-blue-600 dark:text-blue-400 text-2xl"></i>
+                <h1 class="text-lg font-bold">LSS Live-Einsatzkarte</h1>
+                <span id="adapter-status" class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500"></span>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap text-sm">
+                <select id="city-select" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-2 py-1"></select>
+                <button id="mode-cluster-btn" class="px-3 py-1 rounded-lg bg-blue-600 text-white">Cluster</button>
+                <button id="mode-heatmap-btn" class="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700">Heatmap</button>
+                <button id="radar-toggle-btn" class="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700">🌧️ Regenradar</button>
+                <a href="index.html" class="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">← Wetter-Dashboard</a>
+            </div>
+        </div>
+        <div id="radar-controls" class="hidden px-4 pb-2 flex items-center gap-2 text-xs text-gray-500">
+            <span>Radar-Zeitpunkt:</span>
+            <input type="range" id="radar-slider" min="0" max="0" value="0" class="flex-1">
+            <span id="radar-time-label">–</span>
+        </div>
+    </header>
+
+    <main class="flex flex-1 min-h-0">
+        <div id="game-map" class="flex-1"></div>
+        <aside class="w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 p-4 overflow-y-auto hidden lg:block">
+            <h2 class="font-semibold mb-2 text-sm uppercase text-gray-500">Aktive Einsätze</h2>
+            <div id="incident-list" class="space-y-2 text-sm sidebar-scroll"></div>
+
+            <h2 class="font-semibold mt-6 mb-2 text-sm uppercase text-gray-500">Einsatz-Chronik (Replay)</h2>
+            <select id="replay-select" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-2 py-1 text-sm mb-2"></select>
+            <div class="flex items-center gap-2">
+                <button id="replay-play-btn" class="px-3 py-1 rounded-lg bg-blue-600 text-white text-sm">▶ Abspielen</button>
+                <button id="replay-pause-btn" class="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700 text-sm">⏸</button>
+            </div>
+            <input type="range" id="replay-slider" min="0" max="0" value="0" class="w-full mt-2">
+        </aside>
+    </main>
+
+    <footer id="ticker-bar" class="bg-gray-900 text-gray-200 text-xs py-2 border-t border-gray-700">
+        <div id="ticker-track">Warte auf Funkverkehr...</div>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="assets/js/game/event-bus.js"></script>
+    <script src="assets/js/game/cache.js"></script>
+    <script src="assets/js/game/missions-data.js"></script>
+    <script src="assets/js/game/game-adapter.js"></script>
+    <script src="assets/js/game/map-layers.js"></script>
+    <script src="assets/js/game/isochrones.js"></script>
+    <script src="assets/js/game/url-sync.js"></script>
+    <script src="assets/js/game/ticker.js"></script>
+    <script src="assets/js/game/blackbox.js"></script>
+    <script src="assets/js/game/dashboard-main.js"></script>
+</body>
+</html>
