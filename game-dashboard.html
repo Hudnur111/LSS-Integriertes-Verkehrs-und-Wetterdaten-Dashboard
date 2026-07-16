@@ -15,6 +15,7 @@
       #game-map { height: 100%; width: 100%; }
       #ticker-bar { white-space: nowrap; overflow: hidden; }
       #ticker-track { display: inline-block; padding-left: 100%; animation: ticker-scroll 40s linear infinite; }
+      #ticker-bar:hover #ticker-track { animation-play-state: paused; }
       @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
       .sidebar-scroll { max-height: calc(100vh - 220px); overflow-y: auto; }
     </style>
@@ -26,12 +27,14 @@
                 <i class="fas fa-map-location-dot text-blue-600 dark:text-blue-400 text-2xl"></i>
                 <h1 class="text-lg font-bold">LSS Live-Einsatzkarte</h1>
                 <span id="adapter-status" class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500"></span>
+                <span id="weather-coupling-badge" class="hidden text-xs px-2 py-1 rounded-full"></span>
             </div>
             <div class="flex items-center gap-2 flex-wrap text-sm">
                 <select id="city-select" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-lg px-2 py-1"></select>
                 <button id="mode-cluster-btn" class="px-3 py-1 rounded-lg bg-blue-600 text-white">Cluster</button>
                 <button id="mode-heatmap-btn" class="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700">Heatmap</button>
                 <button id="radar-toggle-btn" class="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700">🌧️ Regenradar</button>
+                <button id="sidebar-toggle-btn" class="lg:hidden px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700">☰ Einsätze</button>
                 <a href="index.html" class="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">← Wetter-Dashboard</a>
             </div>
         </div>
@@ -42,9 +45,9 @@
         </div>
     </header>
 
-    <main class="flex flex-1 min-h-0">
+    <main class="flex flex-1 min-h-0 relative">
         <div id="game-map" class="flex-1"></div>
-        <aside class="w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 p-4 overflow-y-auto hidden lg:block">
+        <aside id="sidebar" class="w-80 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 p-4 overflow-y-auto hidden lg:block absolute lg:static right-0 top-0 bottom-0 z-30">
             <h2 class="font-semibold mb-2 text-sm uppercase text-gray-500">Aktive Einsätze</h2>
             <div id="incident-list" class="space-y-2 text-sm sidebar-scroll"></div>
 
@@ -68,6 +71,7 @@
     <script src="assets/js/game/event-bus.js"></script>
     <script src="assets/js/game/cache.js"></script>
     <script src="assets/js/game/missions-data.js"></script>
+    <script src="assets/js/game/weather-coupling.js"></script>
     <script src="assets/js/game/game-adapter.js"></script>
     <script src="assets/js/game/map-layers.js"></script>
     <script src="assets/js/game/isochrones.js"></script>

@@ -31,10 +31,12 @@
      * @param {number} lat - Standort der Wache
      * @param {number} lon
      * @param {Array} nearbyIncidents - aktive Einsätze in der Nähe (zur Abschlagsberechnung)
+     * @param {number} weatherPenalty - zusätzlicher Abschlag 0-1 (z. B. aus der Wetter-Kopplung bei Glätte)
      */
-    render(lat, lon, nearbyIncidents = []) {
+    render(lat, lon, nearbyIncidents = [], weatherPenalty = 0) {
       this.clear();
-      const congestionPenalty = Math.min(0.5, nearbyIncidents.length * 0.08); // bis zu -50% Reichweite
+      const incidentPenalty = Math.min(0.5, nearbyIncidents.length * 0.08); // bis zu -50% Reichweite
+      const congestionPenalty = Math.min(0.7, incidentPenalty + (weatherPenalty || 0));
 
       RING_MINUTES.forEach((minutes, i) => {
         const effectiveSpeed = AVG_SPEED_KMH * (1 - congestionPenalty);

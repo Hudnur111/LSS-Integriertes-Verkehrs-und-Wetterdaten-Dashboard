@@ -64,6 +64,8 @@
     map.setView([city.lat, city.lon], 12);
     adapter.setCenter(city.lat, city.lon);
     renderStationMarkers(city.lat, city.lon);
+    window.LSS_CACHE.invalidateFarFrom(city.lat, city.lon, 5);
+    refreshWeatherCoupling(city.lat, city.lon);
   });
 
   // ---------- Mock-Adapter starten ----------
@@ -84,6 +86,29 @@
   const incidentLayer = new window.LSS_MAP_LAYERS.IncidentLayer(map);
   window.LSS_MAP_LAYERS.wireIncidentLayerToBus(incidentLayer);
   incidentLayer.setMode(state.layers.has('heatmap') ? 'heatmap' : 'markers');
+
+  // ---------- Fahrzeug-/Routen-Layer ----------
+  const vehicleLayer = new window.LSS_MAP_LAYERS.VehicleLayer(map);
+  window.LSS_MAP_LAYERS.wireVehicleLayerToBus(vehicleLayer);
+
+  // ---------- Wetter-Kopplung ----------
+  function refreshWeatherCoupling(lat, lon) {
+    window.LSS_WEATHER_COUPLING.refresh(lat, lon);
+  }
+  bus.on('weather:coupling:update', (wc) => {
+    const el = qs('#weather-coupling-badge');
+    if (!el) return;
+    if (!wc) {
+      el.textContent = '';
+      el.classList.add('hidden');
+      return;
+    }
+    el.classList.remove('hidden');
+    el.textContent = `🌦️ ${wc.label}`;
+    el.className = 'text-xs px-2 py-1 rounded-full ' + (wc.accidentBias > 1.5 ? 'bg-red-100 text-red-700' : wc.accidentBias > 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500');
+  });
+  refreshWeatherCoupling(initialView.lat, initialView.lon);
+  setInterval(() => refreshWeatherCoupling(map.getCenter().lat, map.getCenter().lng), 15 * 60 * 1000);
 
   qs('#mode-cluster-btn').addEventListener('click', () => {
     state.layers.delete('heatmap');
@@ -140,6 +165,11 @@
     const idx = parseInt(e.target.value, 10);
     radarLayer.setFrame(idx);
     qs('#radar-time-label').textContent = radarLayer.getFrameLabel(idx);
+  });
+
+  // ---------- Mobile Sidebar-Toggle ----------
+  qs('#sidebar-toggle-btn').addEventListener('click', () => {
+    qs('#sidebar').classList.toggle('!block');
   });
 
   // ---------- Ticker ----------
@@ -212,7 +242,8 @@
         const nearby = Array.from(state.activeIncidents.values()).filter(
           (inc) => window.LSS_CACHE_UTIL.haversineKm(lat, lon, inc.lat, inc.lon) < 5
         );
-        isochroneLayer.render(lat, lon, nearby);
+        const wc = window.LSS_WEATHER_COUPLING.current;
+        isochroneLayer.render(lat, lon, nearby, wc ? wc.congestionPenalty : 0);
       });
       stationMarkers.push(marker);
     });

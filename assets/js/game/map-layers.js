@@ -143,5 +143,70 @@
     bus.on('game:incident:resolved', ({ id }) => incidentLayer.removeIncident(id));
   }
 
-  global.LSS_MAP_LAYERS = { RadarLayer, IncidentLayer, wireIncidentLayerToBus };
+  // ---------------------------------------------------------------
+  // VehicleLayer – zeichnet Anfahrtsrouten ausrückender Fahrzeuge.
+  // Blockierte/verzögerte Abschnitte (siehe "blocked"-Flag der Adapter)
+  // werden rot hervorgehoben statt in der normalen Routenfarbe.
+  // ---------------------------------------------------------------
+  class VehicleLayer {
+    constructor(map) {
+      this.map = map;
+      this.vehicles = new Map(); // id -> { marker, path: LatLng[], segments: Polyline[] }
+    }
+
+    _vehicleIcon(blocked) {
+      return L.divIcon({
+        className: '',
+        html: `<div style="background:${blocked ? '#dc2626' : '#2563eb'};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>`,
+        iconSize: [14, 14],
+      });
+    }
+
+    updatePosition({ id, lat, lon, blocked, incidentId }) {
+      let entry = this.vehicles.get(id);
+      if (!entry) {
+        entry = { marker: L.marker([lat, lon], { icon: this._vehicleIcon(blocked) }).addTo(this.map), path: [[lat, lon]], segments: [], incidentId };
+        this.vehicles.set(id, entry);
+        return;
+      }
+      const prev = entry.path[entry.path.length - 1];
+      entry.path.push([lat, lon]);
+      entry.marker.setLatLng([lat, lon]);
+      entry.marker.setIcon(this._vehicleIcon(blocked));
+      const segment = L.polyline([prev, [lat, lon]], {
+        color: blocked ? '#dc2626' : '#2563eb',
+        weight: blocked ? 4 : 3,
+        opacity: 0.8,
+        dashArray: blocked ? '4 4' : null,
+      }).addTo(this.map);
+      entry.segments.push(segment);
+    }
+
+    removeVehicle(id) {
+      const entry = this.vehicles.get(id);
+      if (!entry) return;
+      this.map.removeLayer(entry.marker);
+      entry.segments.forEach((s) => this.map.removeLayer(s));
+      this.vehicles.delete(id);
+    }
+
+    /** Entfernt alle Fahrzeuge, die zu einem beendeten Einsatz gehören. */
+    removeByIncident(incidentId) {
+      for (const [id, entry] of this.vehicles) {
+        if (entry.incidentId === incidentId) this.removeVehicle(id);
+      }
+    }
+  }
+
+  function wireVehicleLayerToBus(vehicleLayer) {
+    bus.on('game:vehicle:position', (pos) => {
+      vehicleLayer.updatePosition(pos);
+      if (pos.progress >= 1) {
+        setTimeout(() => vehicleLayer.removeVehicle(pos.id), 3000);
+      }
+    });
+    bus.on('game:incident:resolved', ({ id }) => vehicleLayer.removeByIncident(id));
+  }
+
+  global.LSS_MAP_LAYERS = { RadarLayer, IncidentLayer, VehicleLayer, wireIncidentLayerToBus, wireVehicleLayerToBus };
 })(window);

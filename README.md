@@ -87,7 +87,7 @@ worker/wrangler.toml                # Deployment-Konfiguration für den Worker
 
 ## 🎮 Live-Einsatzkarte (`game-dashboard.html`)
 
-Ein separates Karten-Modul, das In-Game-Einsätze (Feuerwehr, Rettungsdienst, Polizei, THW, Wasserrettung, ...) visuell auf einer Leaflet-Karte darstellt — inklusive Clustering, Heatmap, Regenradar (RainViewer, kostenlos), Ausrück-Radien beim Klick auf eine Wache, URL-Deep-Linking und einem BOS-Ticker.
+Ein separates Karten-Modul, das In-Game-Einsätze (Feuerwehr, Rettungsdienst, Polizei, THW, Wasserrettung, ...) visuell auf einer Leaflet-Karte darstellt — inklusive Clustering, Heatmap, Regenradar (RainViewer, kostenlos), simulierter Fahrzeug-Anfahrt mit Routenlinie, Ausrück-Radien beim Klick auf eine Wache, In-Game-Wetter-Kopplung, URL-Deep-Linking und einem BOS-Ticker. Mobil per ☰-Button einklappbare Seitenleiste.
 
 **Wichtiger Stand der Technik:** Leitstellenspiel bietet keine öffentliche Echtzeit-API/WebSocket für Einsätze oder Fahrzeuge. Die Datenquelle ist daher als austauschbares **Adapter-Interface** (`assets/js/game/game-adapter.js`) gebaut:
 
@@ -97,7 +97,9 @@ Ein separates Karten-Modul, das In-Game-Einsätze (Feuerwehr, Rettungsdienst, Po
 Alle anderen Module (Karten-Rendering, Ticker, Blackbox-Replay, Isochronen) kennen nur den zentralen `EventBus` und funktionieren unverändert, sobald ein echter Adapter die gleichen Events emittiert wie der Mock.
 
 **Weitere Hinweise zur Ehrlichkeit der Umsetzung:**
-- Die **Ausrück-Radien** sind Näherungen (konzentrische Ringe basierend auf einer angenommenen Durchschnittsgeschwindigkeit, abzüglich eines Abschlags für nahe Einsätze), keine echte straßennetzbasierte Routingberechnung — dafür wäre ein Routing-Anbieter mit API-Key nötig (analog zum Verkehrs-Proxy umsetzbar, aber nicht enthalten).
+- Die **Ausrück-Radien** sind Näherungen (konzentrische Ringe basierend auf einer angenommenen Durchschnittsgeschwindigkeit, abzüglich eines Abschlags für nahe Einsätze und für riskantes Wetter), keine echte straßennetzbasierte Routingberechnung — dafür wäre ein Routing-Anbieter mit API-Key nötig (analog zum Verkehrs-Proxy umsetzbar, aber nicht enthalten).
+- Die **Fahrzeug-/Routen-Simulation** (`VehicleLayer` in `map-layers.js`) ist beim Mock-Adapter eine geradlinige Interpolation von einem zufälligen Punkt zum Einsatzort, keine echte Streckenführung entlang des Straßennetzes. Abschnitte nahe anderer aktiver Einsätze werden als "blockiert" markiert (rot, gestrichelt) — eine Heuristik, kein echtes Stau-Signal.
+- Die **In-Game-Wetter-Kopplung** (`assets/js/game/weather-coupling.js`) nutzt echte Open-Meteo-Daten (kein Mock) und erhöht bei Regen/Glätte die Spawn-Rate des Mock-Adapters sowie den Anteil verkehrsbezogener Einsätze — sichtbar als Badge im Header.
 - Der **Hybrid-Cache** (`assets/js/game/cache.js`) dedupliziert gleichzeitige Anfragen und hält Ergebnisse 15–30 Minuten in `sessionStorage` + In-Memory vor, inkl. Invalidierung bei Standortwechsel &gt; 5 km.
 
 ## 📌 Zielgruppe
