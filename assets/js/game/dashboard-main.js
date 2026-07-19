@@ -132,7 +132,8 @@
   // ---------- Regenradar (RainViewer) ----------
   const radarLayer = new window.LSS_MAP_LAYERS.RadarLayer(map);
   let radarLoaded = false;
-  qs('#radar-toggle-btn').addEventListener('click', async () => {
+
+  async function enableRadar() {
     if (!radarLoaded) {
       qs('#radar-toggle-btn').textContent = '🌧️ Lade...';
       try {
@@ -148,24 +149,31 @@
         return;
       }
     }
-    const showing = !radarLayer.visible;
-    if (showing) {
-      radarLayer.show();
-      state.layers.add('radar');
-      qs('#radar-controls').classList.remove('hidden');
-      qs('#radar-toggle-btn').textContent = '🌧️ Regenradar (an)';
-    } else {
-      radarLayer.hide();
-      state.layers.delete('radar');
-      qs('#radar-controls').classList.add('hidden');
-      qs('#radar-toggle-btn').textContent = '🌧️ Regenradar';
-    }
+    radarLayer.show();
+    state.layers.add('radar');
+    qs('#radar-controls').classList.remove('hidden');
+    qs('#radar-toggle-btn').textContent = '🌧️ Regenradar (an)';
+  }
+
+  function disableRadar() {
+    radarLayer.hide();
+    state.layers.delete('radar');
+    qs('#radar-controls').classList.add('hidden');
+    qs('#radar-toggle-btn').textContent = '🌧️ Regenradar';
+  }
+
+  qs('#radar-toggle-btn').addEventListener('click', () => {
+    if (radarLayer.visible) disableRadar();
+    else enableRadar();
   });
   qs('#radar-slider').addEventListener('input', (e) => {
     const idx = parseInt(e.target.value, 10);
     radarLayer.setFrame(idx);
     qs('#radar-time-label').textContent = radarLayer.getFrameLabel(idx);
   });
+
+  // Radar-Zustand aus der URL wiederherstellen (Deep-Link)
+  if (state.layers.has('radar')) enableRadar();
 
   // ---------- Mobile Sidebar-Toggle ----------
   qs('#sidebar-toggle-btn').addEventListener('click', () => {
@@ -269,20 +277,28 @@
 
   function refreshReplayList() {
     const select = qs('#replay-select');
+    const previousValue = select.value;
     const recordings = recorder.listFinished();
     select.innerHTML = recordings
       .map((rec, i) => `<option value="${i}">${rec.incident.name} (${new Date(rec.frames[0].t).toLocaleTimeString('de-DE')})</option>`)
-      .join('') || '<option>Noch keine abgeschlossenen Einsätze</option>';
-    select.dataset.recordings = JSON.stringify(recordings.length);
+      .join('') || '<option value="">Noch keine abgeschlossenen Einsätze</option>';
+    // Auswahl über den Refresh hinweg beibehalten, damit der Dropdown nicht
+    // alle 8s auf den ersten Eintrag zurückspringt, während jemand stöbert.
+    if (previousValue && recordings[parseInt(previousValue, 10)]) {
+      select.value = previousValue;
+    }
   }
   setInterval(refreshReplayList, 8000);
   refreshReplayList();
 
-  qs('#replay-select').addEventListener('change', (e) => {
+  function loadReplaySelection() {
     const recordings = recorder.listFinished();
-    const rec = recordings[parseInt(e.target.value, 10)];
-    if (rec) player.load(rec);
-  });
+    const rec = recordings[parseInt(qs('#replay-select').value, 10)];
+    if (!rec) return;
+    player.load(rec);
+    player.seek(0);
+  }
+  qs('#replay-select').addEventListener('change', loadReplaySelection);
   qs('#replay-play-btn').addEventListener('click', () => player.play());
   qs('#replay-pause-btn').addEventListener('click', () => player.pause());
   qs('#replay-slider').addEventListener('input', (e) => player.seek(parseInt(e.target.value, 10)));
